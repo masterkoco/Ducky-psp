@@ -8,6 +8,7 @@ import re
 import threading
 import subprocess
 import urllib.request
+import urllib.parse
 import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -22,17 +23,17 @@ try:
 except ImportError:
     zstd = None
 
-CONFIG_FILE = "ducky_config.json"
-HISTORY_FILE = "ducky_history.json"
-META_CACHE_FILE = "ducky_meta_cache.json"
-UNDO_LOG_FILE = "ducky_undo_log.json"
+CONFIG_FILE = "duckyshrink_config.json"
+HISTORY_FILE = "duckyshrink_history.json"
+META_CACHE_FILE = "duckyshrink_meta_cache.json"
+UNDO_LOG_FILE = "duckyshrink_undo_log.json"
 LOG_DIR = "logs"
 
-class ISOCompressorApp:
+class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckyISO // PSP Batch Compressor v8.9")
-        self.root.geometry("660x1030")
+        self.root.title("DuckShrink_PSP // Batch Compressor v9.3")
+        self.root.geometry("660x1080")
         
         os.makedirs(LOG_DIR, exist_ok=True)
         
@@ -42,7 +43,7 @@ class ISOCompressorApp:
             for icon_name in ("icon.png", "icon.ico"):
                 icon_path = os.path.join(base_dir, icon_name)
                 if not os.path.exists(icon_path):
-                    icon_path = os.path.join("/opt/duckyiso", icon_name)
+                    icon_path = os.path.join("/opt/duckyshrink", icon_name)
                     
                 if os.path.exists(icon_path):
                     try:
@@ -110,7 +111,7 @@ class ISOCompressorApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKY_ISO [v8.9]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.3]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         # Theme Selector Popup Button
@@ -164,11 +165,11 @@ class ISOCompressorApp:
                                         activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=6, pady=2)
         self.btn_change_out.pack(side=tk.RIGHT)
 
-        # Smart Renaming Frame
+        # Smart Renaming Frame (Local PARAM.SFO)
         self.frame_rename = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.yellow, highlightthickness=1, padx=8, pady=4)
         self.frame_rename.pack(pady=3, fill="x", padx=30)
         
-        self.lbl_rename_title = tk.Label(self.frame_rename, text="RENAME CONFIGURATION (LOCAL PARAM.SFO):", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
+        self.lbl_rename_title = tk.Label(self.frame_rename, text="LOCAL RENAME CONFIGURATION (PARAM.SFO):", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
         self.lbl_rename_title.pack(anchor="w", padx=2)
         
         ren_sub_frame = tk.Frame(self.frame_rename, bg=self.panel_bg)
@@ -203,12 +204,30 @@ class ISOCompressorApp:
         chk_sub_frame.pack(fill="x", pady=2)
 
         self.skip_formatted_var = tk.BooleanVar(value=True)
-        self.chk_skip_formatted = tk.Checkbutton(chk_sub_frame, text="Skip files with [brackets]", variable=self.skip_formatted_var, bg=self.panel_bg, fg=self.yellow, selectcolor=self.bg_color, font=("Monospace", 8))
+        self.chk_skip_formatted = tk.Checkbutton(chk_sub_frame, text="Skip [brackets]", variable=self.skip_formatted_var, bg=self.panel_bg, fg=self.yellow, selectcolor=self.bg_color, font=("Monospace", 8))
         self.chk_skip_formatted.pack(side=tk.LEFT, padx=2)
 
         self.force_rename_var = tk.BooleanVar(value=False)
-        self.chk_force_rename = tk.Checkbutton(chk_sub_frame, text="Force Rename / Ignore History", variable=self.force_rename_var, bg=self.panel_bg, fg=self.pink, selectcolor=self.bg_color, font=("Monospace", 8, "bold"))
+        self.chk_force_rename = tk.Checkbutton(chk_sub_frame, text="Force Rename", variable=self.force_rename_var, bg=self.panel_bg, fg=self.pink, selectcolor=self.bg_color, font=("Monospace", 8, "bold"))
         self.chk_force_rename.pack(side=tk.LEFT, padx=10)
+
+        # Dedicated Online Scraping Frame
+        self.frame_online = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=1, padx=8, pady=4)
+        self.frame_online.pack(pady=3, fill="x", padx=30)
+        
+        self.lbl_online_title = tk.Label(self.frame_online, text="ONLINE SCRAPING HUB (GAMETDB / PKGj):", bg=self.panel_bg, fg=self.cyan, font=("Monospace", 9, "bold"))
+        self.lbl_online_title.pack(anchor="w", padx=2)
+        
+        online_btn_frame = tk.Frame(self.frame_online, bg=self.panel_bg)
+        online_btn_frame.pack(fill="x", pady=3)
+        
+        self.btn_online_fetch = tk.Button(online_btn_frame, text="[ FETCH ONLINE TITLE ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.cyan,
+                                          activebackground=self.cyan, activeforeground="black", command=self.test_online_metadata, relief=tk.SOLID, bd=1, padx=6, pady=3)
+        self.btn_online_fetch.pack(side=tk.LEFT, padx=3)
+
+        self.btn_online_rename = tk.Button(online_btn_frame, text="[ START ONLINE RENAME ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.yellow,
+                                           activebackground=self.yellow, activeforeground="black", command=self.start_online_rename, relief=tk.SOLID, bd=1, padx=6, pady=3)
+        self.btn_online_rename.pack(side=tk.LEFT, padx=3)
 
         # Format Selection
         self.frame_format = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=1, padx=8, pady=4)
@@ -293,7 +312,7 @@ class ISOCompressorApp:
             except Exception:
                 pass
 
-        self.log_term("DuckyISO v8.9 Initialized with Mint & Ubuntu Themes + Popup Selector.")
+        self.log_term("DuckShrink_PSP v9.3 Initialized successfully.")
 
     def load_config(self):
         self.saved_settings = {}
@@ -417,7 +436,6 @@ class ISOCompressorApp:
         self.style.configure("Pink.Horizontal.TProgressbar", thickness=12, background=self.pink, troughcolor=self.bg_color, bordercolor=self.pink)
 
     def open_theme_selector(self):
-        """Opens a popup window listing all available themes for selection."""
         popup = tk.Toplevel(self.root)
         popup.title("Select Theme")
         popup.geometry("320x340")
@@ -477,6 +495,11 @@ class ISOCompressorApp:
                 self.lbl_case.configure(bg=self.panel_bg, fg=self.text_color)
                 self.chk_skip_formatted.configure(bg=self.panel_bg, fg=self.yellow, selectcolor=self.bg_color)
                 self.chk_force_rename.configure(bg=self.panel_bg, fg=self.pink, selectcolor=self.bg_color)
+
+                self.frame_online.configure(bg=self.panel_bg, highlightbackground=self.cyan)
+                self.lbl_online_title.configure(bg=self.panel_bg, fg=self.cyan)
+                self.btn_online_fetch.configure(bg=self.bg_color, fg=self.cyan, activebackground=self.cyan)
+                self.btn_online_rename.configure(bg=self.bg_color, fg=self.yellow, activebackground=self.yellow)
 
                 self.frame_format.configure(bg=self.panel_bg, highlightbackground=self.cyan)
                 self.lbl_fmt_title.configure(bg=self.panel_bg, fg=self.yellow)
@@ -546,6 +569,7 @@ class ISOCompressorApp:
                     found_files.append(os.path.join(root_dir, file))
                     
         if found_files:
+            found_files = list(set(found_files))
             self.process_loaded_files(found_files)
             messagebox.showinfo("Refresh Complete", f"Refreshed folder. Found {len(found_files)} valid file(s).")
         else:
@@ -570,6 +594,7 @@ class ISOCompressorApp:
                 self.last_dir = os.path.dirname(p)
                 
         if found_files:
+            found_files = list(set(found_files))
             self.process_loaded_files(found_files)
             self.save_config()
         else:
@@ -579,8 +604,9 @@ class ISOCompressorApp:
     def browse_files(self):
         paths = filedialog.askopenfilenames(initialdir=self.last_dir, filetypes=[("PSP Game Images", "*.iso *.cso *.zso *.dax"), ("All Files", "*.*")])
         if paths:
+            found_files = list(set(paths))
             self.last_dir = os.path.dirname(paths[0])
-            self.process_loaded_files(list(paths))
+            self.process_loaded_files(found_files)
             self.save_config()
 
     def browse_folder(self):
@@ -595,6 +621,7 @@ class ISOCompressorApp:
                     if file.lower().endswith(valid_exts):
                         found_files.append(os.path.join(root_dir, file))
             if found_files:
+                found_files = list(set(found_files))
                 self.process_loaded_files(found_files)
                 self.save_config()
             else:
@@ -669,6 +696,166 @@ class ISOCompressorApp:
             self.log_term(f"Metadata FAILED for {os.path.basename(test_file)}", is_error=True)
             
         messagebox.showinfo("Metadata Diagnostic", msg)
+
+    def test_online_metadata(self):
+        if not self.file_paths:
+            messagebox.showwarning("NOTICE", "Please select at least one file first to fetch online titles.")
+            return
+        
+        test_file = self.file_paths[0]
+        filename = os.path.basename(test_file)
+        self.log_term(f"Querying online database for: {filename}")
+        
+        id_match = re.search(r'\b[A-Z]{4}\d{5}\b', filename)
+        lookup_id = id_match.group(0) if id_match else None
+        
+        online_title, online_id = "", ""
+        if lookup_id:
+            online_title, online_id = PSPImageReader.query_online_db(lookup_id)
+            
+        if not online_title:
+            clean_query = re.sub(r'\.[a-zA-Z0-9]+$', '', filename)
+            clean_query = re.sub(r'[\(\[].*?[\)\]]', '', clean_query).strip()
+            if len(clean_query) > 2:
+                online_title, online_id = PSPImageReader.query_online_db_by_name(clean_query)
+                
+        msg = f"File: {filename}\n\n"
+        if online_title:
+            msg += f"Online Title Match: {online_title}\n"
+            msg += f"Matched Game ID: {online_id or lookup_id or 'N/A'}"
+            self.log_term(f"Online Lookup Success -> '{online_title}' [{online_id}]")
+        else:
+            msg += "RESULT: No online match found in database for this file."
+            self.log_term(f"Online Lookup Failed for {filename}", is_error=True)
+            
+        messagebox.showinfo("Online Scraper Diagnostic", msg)
+
+    def start_online_rename(self):
+        if not self.file_paths:
+            messagebox.showerror("SYS_ERROR", "NO FILES SELECTED FOR ONLINE RENAME.")
+            return
+        
+        self.log_term("Starting online database batch rename protocol...")
+        self.is_converting = True
+        self.cancel_flag = False
+        self.btn_compress.config(state=tk.DISABLED)
+        self.btn_rename.config(state=tk.DISABLED)
+        self.btn_online_rename.config(state=tk.DISABLED)
+        self.slider.config(state=tk.DISABLED)
+        self.btn_browse_file.config(state=tk.DISABLED)
+        self.btn_browse_folder.config(state=tk.DISABLED)
+        self.btn_change_out.config(state=tk.DISABLED)
+        self.btn_cancel.config(state=tk.NORMAL)
+        
+        threading.Thread(target=self._run_online_rename_thread, daemon=True).start()
+
+    def _run_online_rename_thread(self):
+        total_files = len(self.file_paths)
+        self.progress_batch["maximum"] = total_files
+        renamed_count = 0
+        skipped_count = 0
+        skip_formatted = self.skip_formatted_var.get()
+        force_rename = self.force_rename_var.get()
+        preview_mappings = []
+
+        updated_paths = []
+        for idx, path in enumerate(self.file_paths):
+            if self.cancel_flag: break
+            
+            filename = os.path.basename(path)
+            
+            if not force_rename:
+                if skip_formatted and ('[' in filename or ']' in filename):
+                    self.log_term(f"SKIP (Already Formatted): '{filename}'")
+                    skipped_count += 1
+                    self.progress_batch["value"] = idx + 1
+                    updated_paths.append(path)
+                    continue
+
+            try:
+                dirname, filename = os.path.split(path)
+                ext = os.path.splitext(filename)[1]
+                
+                game_title = ""
+                game_id = ""
+
+                id_match = re.search(r'\b[A-Z]{4}\d{5}\b', filename)
+                lookup_id = id_match.group(0) if id_match else None
+                
+                if lookup_id:
+                    game_title, game_id = PSPImageReader.query_online_db(lookup_id)
+                
+                if not game_title:
+                    clean_query = re.sub(r'\.[a-zA-Z0-9]+$', '', filename)
+                    clean_query = re.sub(r'[\(\[].*?[\)\]]', '', clean_query).strip()
+                    if len(clean_query) > 2:
+                        game_title, game_id = PSPImageReader.query_online_db_by_name(clean_query)
+                        if not game_id and lookup_id:
+                            game_id = lookup_id
+
+                if not game_title:
+                    self.log_term(f"SKIP (Online): Could not find online match for {filename}", is_error=True)
+                    skipped_count += 1
+                    updated_paths.append(path)
+                    continue
+                
+                new_name = self.format_filename(game_title, game_id, ext)
+                new_path = os.path.join(dirname, new_name)
+                
+                if new_path != path and os.path.exists(new_path):
+                    base_n, ext_n = os.path.splitext(new_name)
+                    new_name = f"{base_n}_{random.randint(100,999)}{ext_n}"
+                    new_path = os.path.join(dirname, new_name)
+
+                if new_path != path:
+                    os.rename(path, new_path)
+                    renamed_count += 1
+                    self.completed_history.add(new_path)
+                    self.save_history()
+                    
+                    self.undo_records.append({"old_path": new_path, "original_path": path})
+                    self.save_undo_log()
+                    
+                    updated_paths.append(new_path)
+                    preview_mappings.append((filename, new_name))
+                    self.log_term(f"ONLINE RENAMED: '{filename}' -> '{new_name}'")
+                    self.log_to_file("ONLINE_RENAME", f"'{filename}' -> '{new_name}'")
+                else:
+                    self.completed_history.add(path)
+                    self.save_history()
+                    updated_paths.append(path)
+                
+                self.progress_batch["value"] = idx + 1
+            except Exception as e:
+                err_str = str(e)
+                self.log_term(f"ERROR online renaming {filename}: {err_str}", is_error=True)
+                skipped_count += 1
+                updated_paths.append(path)
+
+        self.file_paths = updated_paths
+        self.root.after(0, lambda: self._finalize_online_rename_ui(renamed_count, skipped_count, preview_mappings))
+
+    def _finalize_online_rename_ui(self, count, skipped, preview_mappings):
+        self.is_converting = False
+        self.btn_compress.config(state=tk.NORMAL)
+        self.btn_rename.config(state=tk.NORMAL)
+        self.btn_online_rename.config(state=tk.NORMAL)
+        self.slider.config(state=tk.NORMAL)
+        self.btn_browse_file.config(state=tk.NORMAL)
+        self.btn_browse_folder.config(state=tk.NORMAL)
+        self.btn_change_out.config(state=tk.NORMAL)
+        self.btn_cancel.config(state=tk.DISABLED)
+        self.lbl_status.config(text=f"ONLINE RENAME COMPLETE: {count} UPDATED, {skipped} SKIPPED", fg=self.cyan)
+        self._play_quack()
+        
+        preview_text = f"Online Batch Rename Finished!\nSuccessfully Renamed: {count} // Skipped: {skipped}\n\n[BEFORE & AFTER PREVIEW]:\n"
+        for before, after in preview_mappings[:12]:
+            preview_text += f"• {before}\n  ➔ {after}\n"
+        if len(preview_mappings) > 12:
+            preview_text += f"\n...and {len(preview_mappings) - 12} more files."
+            
+        self.log_term(f"Online Rename Finished! Renamed: {count}, Skipped: {skipped}")
+        messagebox.showinfo("Online Rename Complete & Preview", preview_text)
 
     def on_slider_change(self, val):
         self.lbl_slider.config(text=f"COMPRESSION_OVERRIDE: [ {val} ]")
@@ -782,6 +969,7 @@ class ISOCompressorApp:
         self.cancel_flag = False
         self.btn_compress.config(state=tk.DISABLED)
         self.btn_rename.config(state=tk.DISABLED)
+        self.btn_online_rename.config(state=tk.DISABLED)
         self.slider.config(state=tk.DISABLED)
         self.btn_browse_file.config(state=tk.DISABLED)
         self.btn_browse_folder.config(state=tk.DISABLED)
@@ -882,6 +1070,7 @@ class ISOCompressorApp:
         self.is_converting = False
         self.btn_compress.config(state=tk.NORMAL)
         self.btn_rename.config(state=tk.NORMAL)
+        self.btn_online_rename.config(state=tk.NORMAL)
         self.slider.config(state=tk.NORMAL)
         self.btn_browse_file.config(state=tk.NORMAL)
         self.btn_browse_folder.config(state=tk.NORMAL)
@@ -958,6 +1147,7 @@ class ISOCompressorApp:
         
         self.btn_compress.config(state=tk.DISABLED)
         self.btn_rename.config(state=tk.DISABLED)
+        self.btn_online_rename.config(state=tk.DISABLED)
         self.slider.config(state=tk.DISABLED)
         self.btn_browse_file.config(state=tk.DISABLED)
         self.btn_browse_folder.config(state=tk.DISABLED)
@@ -1108,6 +1298,7 @@ class ISOCompressorApp:
         self.is_converting = False
         self.btn_compress.config(state=tk.NORMAL)
         self.btn_rename.config(state=tk.NORMAL)
+        self.btn_online_rename.config(state=tk.NORMAL)
         self.slider.config(state=tk.NORMAL)
         self.btn_browse_file.config(state=tk.NORMAL)
         self.btn_browse_folder.config(state=tk.NORMAL)
@@ -1190,6 +1381,42 @@ class PSPImageReader:
                 return self.f.read(self.block_size)
 
     @staticmethod
+    def query_online_db(game_id):
+        """Queries online open databases using Game ID."""
+        try:
+            url = "https://raw.githubusercontent.com/xperia64/pkgj/master/titles.txt"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=4) as response:
+                content = response.read().decode('utf-8', errors='ignore')
+                for line in content.splitlines():
+                    parts = line.split(';')
+                    if len(parts) >= 2 and parts[0].strip() == game_id.strip():
+                        return parts[1].strip(), game_id
+        except Exception:
+            pass
+        return "", ""
+
+    @staticmethod
+    def query_online_db_by_name(query_name):
+        """Queries online database by keyword match."""
+        try:
+            url = "https://raw.githubusercontent.com/xperia64/pkgj/master/titles.txt"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            q_lower = query_name.lower()
+            with urllib.request.urlopen(req, timeout=4) as response:
+                content = response.read().decode('utf-8', errors='ignore')
+                for line in content.splitlines():
+                    parts = line.split(';')
+                    if len(parts) >= 2:
+                        title = parts[1].strip()
+                        game_id = parts[0].strip()
+                        if q_lower in title.lower() or title.lower() in q_lower:
+                            return title, game_id
+        except Exception:
+            pass
+        return "", ""
+
+    @staticmethod
     def get_game_metadata(filepath):
         """Exhaustively scans the entire file blocks to locate and parse the true game PARAM.SFO."""
         try:
@@ -1254,5 +1481,5 @@ if __name__ == "__main__":
     else:
         root = tk.Tk()
         
-    app = ISOCompressorApp(root)
+    app = DuckShrinkApp(root)
     root.mainloop()
