@@ -31,8 +31,8 @@ LOG_DIR = "logs"
 class ISOCompressorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckyISO // PSP Batch Compressor v8.8")
-        self.root.geometry("660x1020")
+        self.root.title("DuckyISO // PSP Batch Compressor v8.9")
+        self.root.geometry("660x1030")
         
         os.makedirs(LOG_DIR, exist_ok=True)
         
@@ -54,11 +54,19 @@ class ISOCompressorApp:
         except Exception:
             pass
 
-        # Comprehensive Theme Palettes (Teal Default & OS Classics)
+        # Comprehensive Theme Palettes (Including Linux Mint & Ubuntu)
         self.themes = {
             "Teal & Cyberpunk": {
                 "bg": "#0B2525", "panel": "#113A3A", "cyan": "#00FFFF", 
                 "pink": "#FF007F", "yellow": "#FFFF00", "text": "#E0F0F0"
+            },
+            "Linux Mint 22.3": {
+                "bg": "#2A323D", "panel": "#37414B", "cyan": "#87CD28", 
+                "pink": "#5C6A79", "yellow": "#F39C12", "text": "#FFFFFF"
+            },
+            "Ubuntu Yaru": {
+                "bg": "#2C001E", "panel": "#3C002B", "cyan": "#E95420", 
+                "pink": "#F47721", "yellow": "#AEA79F", "text": "#FFFFFF"
             },
             "Windows 98 Classic": {
                 "bg": "#008080", "panel": "#C0C0C0", "cyan": "#000080", 
@@ -67,10 +75,6 @@ class ISOCompressorApp:
             "Windows XP Luna": {
                 "bg": "#245EDC", "panel": "#ECE9D8", "cyan": "#0055EA", 
                 "pink": "#FF6600", "yellow": "#3C3C3C", "text": "#000000"
-            },
-            "Windows 7 Aero": {
-                "bg": "#1C355E", "panel": "#D4D4D4", "cyan": "#0078D7", 
-                "pink": "#B43939", "yellow": "#222222", "text": "#111111"
             },
             "GNOME Adwaita": {
                 "bg": "#242424", "panel": "#303030", "cyan": "#3584E4", 
@@ -106,12 +110,12 @@ class ISOCompressorApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKY_ISO [v8.8]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKY_ISO [v8.9]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
-        # Theme Switcher Button
-        self.btn_theme = tk.Button(header_frame, text="THEME: TEAL", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow,
-                                   activebackground=self.yellow, activeforeground="black", command=self.cycle_theme, relief=tk.SOLID, bd=1, padx=6, pady=2)
+        # Theme Selector Popup Button
+        self.btn_theme = tk.Button(header_frame, text="[ THEMES ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow,
+                                   activebackground=self.yellow, activeforeground="black", command=self.open_theme_selector, relief=tk.SOLID, bd=1, padx=6, pady=2)
         self.btn_theme.pack(side=tk.RIGHT)
         
         self.lbl_drop_hint = tk.Label(root, text=">> DRAG & DROP FILES/FOLDERS OR USE SELECTORS", font=("Monospace", 8), bg=self.bg_color, fg=self.yellow)
@@ -160,7 +164,7 @@ class ISOCompressorApp:
                                         activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=6, pady=2)
         self.btn_change_out.pack(side=tk.RIGHT)
 
-        # Smart Renaming Frame (With Force Rename Checkbox)
+        # Smart Renaming Frame
         self.frame_rename = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.yellow, highlightthickness=1, padx=8, pady=4)
         self.frame_rename.pack(pady=3, fill="x", padx=30)
         
@@ -289,7 +293,7 @@ class ISOCompressorApp:
             except Exception:
                 pass
 
-        self.log_term("DuckyISO v8.8 Initialized with Force Rename & Pattern Override.")
+        self.log_term("DuckyISO v8.9 Initialized with Mint & Ubuntu Themes + Popup Selector.")
 
     def load_config(self):
         self.saved_settings = {}
@@ -299,6 +303,7 @@ class ISOCompressorApp:
                     self.saved_settings = json.load(f)
                     self.custom_output_dir = self.saved_settings.get("custom_output_dir", "")
                     self.last_dir = self.saved_settings.get("last_dir", os.path.expanduser("~"))
+                    self.current_theme_name = self.saved_settings.get("theme", "Teal & Cyberpunk")
             except Exception:
                 pass
 
@@ -309,7 +314,8 @@ class ISOCompressorApp:
             "pattern": self.pattern_var.get(),
             "case": self.case_var.get(),
             "format": self.format_var.get(),
-            "compression_level": self.level_var.get()
+            "compression_level": self.level_var.get(),
+            "theme": self.current_theme_name
         }
         try:
             with open(CONFIG_FILE, 'w') as f:
@@ -410,67 +416,96 @@ class ISOCompressorApp:
         self.style.configure("Cyan.Horizontal.TProgressbar", thickness=12, background=self.cyan, troughcolor=self.bg_color, bordercolor=self.cyan)
         self.style.configure("Pink.Horizontal.TProgressbar", thickness=12, background=self.pink, troughcolor=self.bg_color, bordercolor=self.pink)
 
-    def cycle_theme(self):
-        names = list(self.themes.keys())
-        next_idx = (names.index(self.current_theme_name) + 1) % len(names)
-        self.current_theme_name = names[next_idx]
-        self.apply_theme_colors()
-        self.update_ttk_styles()
-        
-        short_theme_label = self.current_theme_name.split()[0].upper()
-        self.btn_theme.config(text=f"THEME: {short_theme_label}")
-        self.root.configure(bg=self.bg_color)
-        
-        for widget in self.root.winfo_children():
-            try:
-                widget.configure(bg=self.bg_color)
-            except Exception:
-                pass
-                
-        self.lbl_title.configure(bg=self.bg_color, fg=self.cyan)
-        self.btn_theme.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
-        self.lbl_drop_hint.configure(bg=self.bg_color, fg=self.yellow)
-        self.frame_browse.configure(bg=self.bg_color)
-        self.btn_browse_file.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
-        self.btn_browse_folder.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
-        self.btn_refresh.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
-        self.btn_test_meta.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
-        self.btn_undo.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
-        self.btn_open_logs.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
-        
-        self.frame_output.configure(bg=self.panel_bg, highlightbackground=self.pink)
-        self.lbl_out_title.configure(bg=self.panel_bg, fg=self.text_color)
-        self.btn_change_out.configure(bg=self.bg_color, fg=self.pink, activebackground=self.pink)
-        
-        self.frame_rename.configure(bg=self.panel_bg, highlightbackground=self.yellow)
-        self.lbl_rename_title.configure(bg=self.panel_bg, fg=self.yellow)
-        self.lbl_pattern.configure(bg=self.panel_bg, fg=self.text_color)
-        self.lbl_case.configure(bg=self.panel_bg, fg=self.text_color)
-        self.chk_skip_formatted.configure(bg=self.panel_bg, fg=self.yellow, selectcolor=self.bg_color)
-        self.chk_force_rename.configure(bg=self.panel_bg, fg=self.pink, selectcolor=self.bg_color)
+    def open_theme_selector(self):
+        """Opens a popup window listing all available themes for selection."""
+        popup = tk.Toplevel(self.root)
+        popup.title("Select Theme")
+        popup.geometry("320x340")
+        popup.configure(bg=self.bg_color)
+        popup.grab_set()
 
-        self.frame_format.configure(bg=self.panel_bg, highlightbackground=self.cyan)
-        self.lbl_fmt_title.configure(bg=self.panel_bg, fg=self.yellow)
-        self.rb_zso.configure(bg=self.panel_bg, fg=self.text_color, activebackground=self.panel_bg, activeforeground=self.cyan)
-        self.rb_cso.configure(bg=self.panel_bg, fg=self.text_color, activebackground=self.panel_bg, activeforeground=self.cyan)
-        
-        self.frame_slider.configure(bg=self.bg_color)
-        self.lbl_slider.configure(bg=self.bg_color, fg=self.text_color)
-        self.slider.configure(bg=self.bg_color, fg=self.cyan, troughcolor=self.panel_bg)
-        
-        self.frame_actions.configure(bg=self.bg_color)
-        self.btn_compress.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
-        self.btn_rename.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
-        self.btn_cancel.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
-        
-        self.lbl_status.configure(bg=self.bg_color, fg=self.text_color)
-        self.lbl_pbar1.configure(bg=self.bg_color, fg=self.cyan)
-        self.lbl_pbar2.configure(bg=self.bg_color, fg=self.pink)
-        self.term_frame.configure(bg="#000000", highlightbackground=self.cyan)
-        self.lbl_term_title.configure(bg="#000000", fg=self.cyan)
-        self.term_box.configure(bg="#000000", fg="#00FF66")
-        
-        self.log_term(f"Switched theme to {self.current_theme_name}")
+        lbl = tk.Label(popup, text="CHOOSE APPLICATION THEME:", font=("Monospace", 9, "bold"), bg=self.bg_color, fg=self.yellow)
+        lbl.pack(pady=10)
+
+        listbox_frame = tk.Frame(popup, bg=self.bg_color)
+        listbox_frame.pack(fill="both", expand=True, padx=20, pady=5)
+
+        scrollbar = tk.Scrollbar(listbox_frame)
+        scrollbar.pack(side=tk.RIGHT, fill="y")
+
+        theme_listbox = tk.Listbox(listbox_frame, font=("Monospace", 9), bg=self.panel_bg, fg=self.text_color, 
+                                   selectbackground=self.cyan, selectforeground="black", height=8, yscrollcommand=scrollbar.set, bd=0, highlightthickness=0)
+        theme_listbox.pack(side=tk.LEFT, fill="both", expand=True)
+        scrollbar.config(command=theme_listbox.yview)
+
+        for name in self.themes.keys():
+            theme_listbox.insert(tk.END, name)
+
+        def apply_selected_theme():
+            selection = theme_listbox.curselection()
+            if selection:
+                theme_name = theme_listbox.get(selection[0])
+                self.current_theme_name = theme_name
+                self.apply_theme_colors()
+                self.update_ttk_styles()
+                self.root.configure(bg=self.bg_color)
+                
+                for widget in self.root.winfo_children():
+                    try:
+                        widget.configure(bg=self.bg_color)
+                    except Exception:
+                        pass
+                        
+                self.lbl_title.configure(bg=self.bg_color, fg=self.cyan)
+                self.btn_theme.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
+                self.lbl_drop_hint.configure(bg=self.bg_color, fg=self.yellow)
+                self.frame_browse.configure(bg=self.bg_color)
+                self.btn_browse_file.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
+                self.btn_browse_folder.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
+                self.btn_refresh.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
+                self.btn_test_meta.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
+                self.btn_undo.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
+                self.btn_open_logs.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
+                
+                self.frame_output.configure(bg=self.panel_bg, highlightbackground=self.pink)
+                self.lbl_out_title.configure(bg=self.panel_bg, fg=self.text_color)
+                self.btn_change_out.configure(bg=self.bg_color, fg=self.pink, activebackground=self.pink)
+                
+                self.frame_rename.configure(bg=self.panel_bg, highlightbackground=self.yellow)
+                self.lbl_rename_title.configure(bg=self.panel_bg, fg=self.yellow)
+                self.lbl_pattern.configure(bg=self.panel_bg, fg=self.text_color)
+                self.lbl_case.configure(bg=self.panel_bg, fg=self.text_color)
+                self.chk_skip_formatted.configure(bg=self.panel_bg, fg=self.yellow, selectcolor=self.bg_color)
+                self.chk_force_rename.configure(bg=self.panel_bg, fg=self.pink, selectcolor=self.bg_color)
+
+                self.frame_format.configure(bg=self.panel_bg, highlightbackground=self.cyan)
+                self.lbl_fmt_title.configure(bg=self.panel_bg, fg=self.yellow)
+                self.rb_zso.configure(bg=self.panel_bg, fg=self.text_color, activebackground=self.panel_bg, activeforeground=self.cyan)
+                self.rb_cso.configure(bg=self.panel_bg, fg=self.text_color, activebackground=self.panel_bg, activeforeground=self.cyan)
+                
+                self.frame_slider.configure(bg=self.bg_color)
+                self.lbl_slider.configure(bg=self.bg_color, fg=self.text_color)
+                self.slider.configure(bg=self.bg_color, fg=self.cyan, troughcolor=self.panel_bg)
+                
+                self.frame_actions.configure(bg=self.bg_color)
+                self.btn_compress.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
+                self.btn_rename.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
+                self.btn_cancel.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
+                
+                self.lbl_status.configure(bg=self.bg_color, fg=self.text_color)
+                self.lbl_pbar1.configure(bg=self.bg_color, fg=self.cyan)
+                self.lbl_pbar2.configure(bg=self.bg_color, fg=self.pink)
+                self.term_frame.configure(bg="#000000", highlightbackground=self.cyan)
+                self.lbl_term_title.configure(bg="#000000", fg=self.cyan)
+                self.term_box.configure(bg="#000000", fg="#00FF66")
+
+                self.save_config()
+                self.log_term(f"Switched theme to {theme_name}")
+                popup.destroy()
+
+        btn_apply = tk.Button(popup, text="[ APPLY THEME ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.cyan,
+                              activebackground=self.cyan, activeforeground="black", command=apply_selected_theme, relief=tk.SOLID, bd=1, padx=10, pady=5)
+        btn_apply.pack(pady=12)
 
     def _ensure_quack_downloaded(self):
         if not os.path.exists(self.sound_file):
@@ -770,7 +805,6 @@ class ISOCompressorApp:
             
             filename = os.path.basename(path)
             
-            # Skip check only if force rename is NOT checked
             if not force_rename:
                 if skip_formatted and ('[' in filename or ']' in filename):
                     self.log_term(f"SKIP (Already Formatted): '{filename}'")
