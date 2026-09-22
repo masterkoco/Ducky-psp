@@ -3,9 +3,8 @@ A cyberpunk-styled, multithreaded PSP ISO/CSO/ZSO batch compressor, metadata rea
 
 ## 🚀 One-Line Installer
 Open your terminal and paste the following command to automatically install DuckyISO and all of its dependencies:
-
 ```bash
-git clone https://github.com/masterkoco/Ducky-psp.git && cd Ducky-psp && bash install.sh
+<(curl -s https://raw.githubusercontent.com/masterkoco/DuckShrink_PSP/main/install.sh)
 ```
 ## TO UNINSTALL ON LINUX RUN
 ```bash
