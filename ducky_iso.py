@@ -1,4 +1,5 @@
 import os
+import json
 import zlib
 import random
 import struct
@@ -20,12 +21,25 @@ try:
 except ImportError:
     zstd = None
 
+CONFIG_FILE = "ducky_config.json"
+
 class ISOCompressorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckyISO // PSP Batch Compressor v5.2")
-        self.root.geometry("620x860")
+        self.root.title("DuckyISO // PSP Batch Compressor v7.1")
+        self.root.geometry("640x930")
         
+        # Set Window / Taskbar Icon for Linux/Windows
+        for icon_name in ("icon.png", "icon.ico"):
+            icon_path = os.path.join(os.path.dirname(__file__), icon_name)
+            if os.path.exists(icon_path):
+                try:
+                    img = tk.PhotoImage(file=icon_path)
+                    self.root.iconphoto(True, img)
+                    break
+                except Exception:
+                    pass
+
         # Color Palettes (Cyberpunk Themes)
         self.themes = {
             "Neon Cyberpunk": {
@@ -46,8 +60,12 @@ class ISOCompressorApp:
         
         self.file_paths = []
         self.custom_output_dir = ""
+        self.last_dir = os.path.expanduser("~")
         self.is_converting = False
         self.cancel_flag = False
+        
+        # Load saved configuration settings
+        self.load_config()
         
         # Auto-download Duck Quack
         self.sound_file = "quack.ogg"
@@ -60,42 +78,42 @@ class ISOCompressorApp:
         
         # Header Frame
         header_frame = tk.Frame(root, bg=self.bg_color)
-        header_frame.pack(pady=(12, 4), fill="x", padx=20)
+        header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        tk.Label(header_frame, text="DUCKY_ISO [v5.2]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan).pack(side=tk.LEFT)
+        tk.Label(header_frame, text="DUCKY_ISO [v7.1]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan).pack(side=tk.LEFT)
         
         # Theme Switcher Button
         self.btn_theme = tk.Button(header_frame, text="THEME: CYBERPUNK", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow,
                                    activebackground=self.yellow, activeforeground="black", command=self.cycle_theme, relief=tk.SOLID, bd=1, padx=6, pady=2)
         self.btn_theme.pack(side=tk.RIGHT)
         
-        tk.Label(root, text=">> DRAG & DROP .ISO/.CSO/.ZSO FILES OR USE SELECTORS", font=("Monospace", 8), bg=self.bg_color, fg=self.yellow).pack(pady=(0, 6))
+        tk.Label(root, text=">> DRAG & DROP FILES/FOLDERS OR USE SELECTORS", font=("Monospace", 8), bg=self.bg_color, fg=self.yellow).pack(pady=(0, 4))
         
         # File/Folder Selection Buttons
         frame_browse = tk.Frame(root, bg=self.bg_color)
-        frame_browse.pack(pady=4)
+        frame_browse.pack(pady=3)
         
         self.btn_browse_file = tk.Button(frame_browse, text="[ SELECT FILE(S) ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.cyan, 
-                                    activebackground=self.cyan, activeforeground="black", command=self.browse_files, relief=tk.SOLID, bd=1, padx=8, pady=4)
-        self.btn_browse_file.pack(side=tk.LEFT, padx=6)
+                                    activebackground=self.cyan, activeforeground="black", command=self.browse_files, relief=tk.SOLID, bd=1, padx=6, pady=3)
+        self.btn_browse_file.pack(side=tk.LEFT, padx=5)
 
         self.btn_browse_folder = tk.Button(frame_browse, text="[ SELECT FOLDER ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.pink, 
-                                    activebackground=self.pink, activeforeground="black", command=self.browse_folder, relief=tk.SOLID, bd=1, padx=8, pady=4)
-        self.btn_browse_folder.pack(side=tk.LEFT, padx=6)
+                                    activebackground=self.pink, activeforeground="black", command=self.browse_folder, relief=tk.SOLID, bd=1, padx=6, pady=3)
+        self.btn_browse_folder.pack(side=tk.LEFT, padx=5)
 
-        # Diagnostic Test Button
         self.btn_test_meta = tk.Button(frame_browse, text="[ TEST METADATA ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.yellow, 
-                                       activebackground=self.yellow, activeforeground="black", command=self.test_metadata, relief=tk.SOLID, bd=1, padx=8, pady=4)
-        self.btn_test_meta.pack(side=tk.LEFT, padx=6)
+                                       activebackground=self.yellow, activeforeground="black", command=self.test_metadata, relief=tk.SOLID, bd=1, padx=6, pady=3)
+        self.btn_test_meta.pack(side=tk.LEFT, padx=5)
         
         self.lbl_file = tk.Label(root, text="STATUS: AWAITING INPUT", bg=self.bg_color, fg="#555555", font=("Monospace", 9, "bold"))
-        self.lbl_file.pack(pady=4)
+        self.lbl_file.pack(pady=3)
         
         # Output Path Configuration Frame
-        self.frame_output = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.pink, highlightthickness=1, padx=8, pady=6)
-        self.frame_output.pack(pady=4, fill="x", padx=30)
+        self.frame_output = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.pink, highlightthickness=1, padx=8, pady=4)
+        self.frame_output.pack(pady=3, fill="x", padx=30)
         
-        self.lbl_out_title = tk.Label(self.frame_output, text="OUTPUT: /.../compressed (Auto)", bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8, "bold"), anchor="w")
+        out_display_text = f"OUTPUT: {self.custom_output_dir[:30]}..." if self.custom_output_dir else "OUTPUT: /.../compressed (Auto)"
+        self.lbl_out_title = tk.Label(self.frame_output, text=out_display_text, bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8, "bold"), anchor="w")
         self.lbl_out_title.pack(side=tk.LEFT, fill="x", expand=True)
         
         self.btn_change_out = tk.Button(self.frame_output, text="[ CHANGE ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.pink,
@@ -103,54 +121,56 @@ class ISOCompressorApp:
         self.btn_change_out.pack(side=tk.RIGHT)
 
         # Smart Renaming Frame
-        self.frame_rename = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.yellow, highlightthickness=1, padx=8, pady=6)
-        self.frame_rename.pack(pady=4, fill="x", padx=30)
+        self.frame_rename = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.yellow, highlightthickness=1, padx=8, pady=4)
+        self.frame_rename.pack(pady=3, fill="x", padx=30)
         
-        tk.Label(self.frame_rename, text="RENAME SETTINGS:", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold")).pack(anchor="w", padx=4)
+        tk.Label(self.frame_rename, text="RENAME SETTINGS:", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold")).pack(anchor="w", padx=2)
         
         ren_opts_frame = tk.Frame(self.frame_rename, bg=self.panel_bg)
-        ren_opts_frame.pack(fill="x", pady=3)
+        ren_opts_frame.pack(fill="x", pady=2)
         
-        self.rename_mode_var = tk.StringVar(value="OFF")
-        tk.Radiobutton(ren_opts_frame, text="Off", variable=self.rename_mode_var, value="OFF", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, font=("Monospace", 8, "bold")).pack(side=tk.LEFT, padx=5)
-        tk.Radiobutton(ren_opts_frame, text="After Compress", variable=self.rename_mode_var, value="AFTER", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, font=("Monospace", 8, "bold")).pack(side=tk.LEFT, padx=5)
-        tk.Radiobutton(ren_opts_frame, text="Rename NOW", variable=self.rename_mode_var, value="NOW", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, font=("Monospace", 8, "bold")).pack(side=tk.LEFT, padx=5)
+        self.rename_mode_var = tk.StringVar(value=self.saved_settings.get("rename_mode", "OFF"))
+        tk.Radiobutton(ren_opts_frame, text="Off", variable=self.rename_mode_var, value="OFF", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, font=("Monospace", 8, "bold"), command=self.save_config).pack(side=tk.LEFT, padx=4)
+        tk.Radiobutton(ren_opts_frame, text="After Compress", variable=self.rename_mode_var, value="AFTER", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, font=("Monospace", 8, "bold"), command=self.save_config).pack(side=tk.LEFT, padx=4)
+        tk.Radiobutton(ren_opts_frame, text="Rename NOW", variable=self.rename_mode_var, value="NOW", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, font=("Monospace", 8, "bold"), command=self.save_config).pack(side=tk.LEFT, padx=4)
 
-        # Sub-options for format and casing
         ren_sub_frame = tk.Frame(self.frame_rename, bg=self.panel_bg)
-        ren_sub_frame.pack(fill="x", pady=3)
+        ren_sub_frame.pack(fill="x", pady=2)
         
-        tk.Label(ren_sub_frame, text="Pattern:", bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8)).pack(side=tk.LEFT, padx=4)
-        self.pattern_var = tk.StringVar(value="Title Only")
-        self.pattern_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.pattern_var, values=["Title Only", "Title [GameID]", "[GameID] Title", "Title - GameID"], state="readonly", width=16)
-        self.pattern_dropdown.pack(side=tk.LEFT, padx=4)
+        tk.Label(ren_sub_frame, text="Pattern:", bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8)).pack(side=tk.LEFT, padx=2)
+        self.pattern_var = tk.StringVar(value=self.saved_settings.get("pattern", "Title Only"))
+        self.pattern_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.pattern_var, values=["Title Only", "Title [GameID]", "[GameID] Title", "Title - GameID"], state="readonly", width=15)
+        self.pattern_dropdown.pack(side=tk.LEFT, padx=3)
+        self.pattern_dropdown.bind("<<ComboboxSelected>>", lambda e: self.save_config())
         
-        tk.Label(ren_sub_frame, text="Case:", bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8)).pack(side=tk.LEFT, padx=6)
-        self.case_var = tk.StringVar(value="Normal")
-        self.case_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.case_var, values=["Normal", "ALL CAPS", "all lowercase", "Title Case", "snake_case"], state="readonly", width=13)
-        self.case_dropdown.pack(side=tk.LEFT, padx=4)
+        tk.Label(ren_sub_frame, text="Case:", bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8)).pack(side=tk.LEFT, padx=4)
+        self.case_var = tk.StringVar(value=self.saved_settings.get("case", "Normal"))
+        self.case_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.case_var, values=["Normal", "ALL CAPS", "all lowercase", "Title Case", "snake_case"], state="readonly", width=12)
+        self.case_dropdown.pack(side=tk.LEFT, padx=3)
+        self.case_dropdown.bind("<<ComboboxSelected>>", lambda e: self.save_config())
 
         # Format Selection
-        self.frame_format = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=1, padx=8, pady=6)
-        self.frame_format.pack(pady=6, fill="x", padx=30)
+        self.frame_format = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=1, padx=8, pady=4)
+        self.frame_format.pack(pady=4, fill="x", padx=30)
         
         self.lbl_fmt_title = tk.Label(self.frame_format, text="OUTPUT_FORMAT:", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
-        self.lbl_fmt_title.pack(side=tk.LEFT, padx=8)
+        self.lbl_fmt_title.pack(side=tk.LEFT, padx=6)
         
-        self.format_var = tk.StringVar(value="ZSO")
-        self.rb_zso = tk.Radiobutton(self.frame_format, text="ZSO (ZSTD)", variable=self.format_var, value="ZSO", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, activebackground=self.panel_bg, activeforeground=self.cyan, font=("Monospace", 9, "bold"), command=self.update_estimate)
-        self.rb_zso.pack(side=tk.LEFT, padx=5)
-        self.rb_cso = tk.Radiobutton(self.frame_format, text="CSO (ZLIB)", variable=self.format_var, value="CSO", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, activebackground=self.panel_bg, activeforeground=self.cyan, font=("Monospace", 9, "bold"), command=self.update_estimate)
-        self.rb_cso.pack(side=tk.LEFT, padx=5)
+        self.format_var = tk.StringVar(value=self.saved_settings.get("format", "ZSO"))
+        self.rb_zso = tk.Radiobutton(self.frame_format, text="ZSO (ZSTD)", variable=self.format_var, value="ZSO", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, activebackground=self.panel_bg, activeforeground=self.cyan, font=("Monospace", 9, "bold"), command=self.on_format_change)
+        self.rb_zso.pack(side=tk.LEFT, padx=4)
+        self.rb_cso = tk.Radiobutton(self.frame_format, text="CSO (ZLIB)", variable=self.format_var, value="CSO", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, activebackground=self.panel_bg, activeforeground=self.cyan, font=("Monospace", 9, "bold"), command=self.on_format_change)
+        self.rb_cso.pack(side=tk.LEFT, padx=4)
         
         # Compression Slider
         frame_slider = tk.Frame(root, bg=self.bg_color)
-        frame_slider.pack(pady=5, fill="x", padx=30)
+        frame_slider.pack(pady=3, fill="x", padx=30)
         
-        self.lbl_slider = tk.Label(frame_slider, text="COMPRESSION_OVERRIDE: [ 5 ]", bg=self.bg_color, fg=self.text_color, font=("Monospace", 9, "bold"))
+        slider_lvl = self.saved_settings.get("compression_level", 5)
+        self.lbl_slider = tk.Label(frame_slider, text=f"COMPRESSION_OVERRIDE: [ {slider_lvl} ]", bg=self.bg_color, fg=self.text_color, font=("Monospace", 9, "bold"))
         self.lbl_slider.pack()
         
-        self.level_var = tk.IntVar(value=5)
+        self.level_var = tk.IntVar(value=slider_lvl)
         self.slider = tk.Scale(frame_slider, from_=1, to=10, orient=tk.HORIZONTAL, variable=self.level_var, 
                                bg=self.bg_color, fg=self.cyan, troughcolor=self.panel_bg, 
                                activebackground=self.pink, highlightthickness=0, command=self.on_slider_change)
@@ -158,33 +178,47 @@ class ISOCompressorApp:
         
         # Size Estimate Display
         self.lbl_estimate = tk.Label(root, text="ESTIMATED YIELD: -- MB ?", font=("Monospace", 10, "bold"), bg=self.bg_color, fg=self.yellow)
-        self.lbl_estimate.pack(pady=5)
+        self.lbl_estimate.pack(pady=3)
         
         # Action Buttons
         frame_actions = tk.Frame(root, bg=self.bg_color)
-        frame_actions.pack(pady=5)
+        frame_actions.pack(pady=3)
         
         self.btn_convert = tk.Button(frame_actions, text="> EXECUTE <", font=("Monospace", 11, "bold"), bg=self.panel_bg, fg=self.cyan, 
-                                     activebackground=self.cyan, activeforeground="black", command=self.start_action, relief=tk.SOLID, bd=1, padx=18, pady=6)
-        self.btn_convert.pack(side=tk.LEFT, padx=12)
+                                     activebackground=self.cyan, activeforeground="black", command=self.start_action, relief=tk.SOLID, bd=1, padx=16, pady=5)
+        self.btn_convert.pack(side=tk.LEFT, padx=10)
 
         self.btn_cancel = tk.Button(frame_actions, text="> ABORT <", font=("Monospace", 11, "bold"), bg=self.panel_bg, fg=self.pink, 
-                                    activebackground=self.pink, activeforeground="black", command=self.cancel_conversion, relief=tk.SOLID, bd=1, padx=18, pady=6, state=tk.DISABLED)
-        self.btn_cancel.pack(side=tk.LEFT, padx=12)
+                                    activebackground=self.pink, activeforeground="black", command=self.cancel_conversion, relief=tk.SOLID, bd=1, padx=16, pady=5, state=tk.DISABLED)
+        self.btn_cancel.pack(side=tk.LEFT, padx=10)
         
         # Progress Tracking
         self.lbl_status = tk.Label(root, text="SYSTEM IDLE", bg=self.bg_color, fg=self.text_color, font=("Monospace", 9, "bold"))
-        self.lbl_status.pack(pady=3)
+        self.lbl_status.pack(pady=2)
         
         self.lbl_pbar1 = tk.Label(root, text="[ CURRENT THREAD ]", bg=self.bg_color, fg=self.cyan, font=("Monospace", 8))
         self.lbl_pbar1.pack()
         self.progress_file = ttk.Progressbar(root, orient="horizontal", length=440, mode="determinate", style="Cyan.Horizontal.TProgressbar")
-        self.progress_file.pack(pady=2)
+        self.progress_file.pack(pady=1)
 
         self.lbl_pbar2 = tk.Label(root, text="[ MASTER BATCH ]", bg=self.bg_color, fg=self.pink, font=("Monospace", 8))
-        self.lbl_pbar2.pack(pady=(5,0))
+        self.lbl_pbar2.pack(pady=(3,0))
         self.progress_batch = ttk.Progressbar(root, orient="horizontal", length=440, mode="determinate", style="Pink.Horizontal.TProgressbar")
-        self.progress_batch.pack(pady=2)
+        self.progress_batch.pack(pady=1)
+
+        # Terminal Console Box at Bottom
+        term_frame = tk.Frame(root, bg="#000000", highlightbackground=self.cyan, highlightthickness=1)
+        term_frame.pack(pady=8, fill="both", expand=True, padx=25)
+        
+        tk.Label(term_frame, text="[ TERMINAL OUTPUT LOG ]", bg="#000000", fg=self.cyan, font=("Monospace", 8, "bold")).pack(anchor="w", padx=5)
+        
+        self.term_box = tk.Text(term_frame, bg="#000000", fg="#00FF66", font=("Monospace", 8), height=6, bd=0, highlightthickness=0)
+        self.term_box.pack(side=tk.LEFT, fill="both", expand=True, padx=5, pady=2)
+        self.term_box.config(state=tk.DISABLED)
+        
+        term_scroll = tk.Scrollbar(term_frame, command=self.term_box.yview, bg="#000000")
+        term_scroll.pack(side=tk.RIGHT, fill="y")
+        self.term_box.config(yscrollcommand=term_scroll.set)
 
         if TkinterDnD:
             try:
@@ -192,6 +226,41 @@ class ISOCompressorApp:
                 self.root.dnd_bind('<<Drop>>', self.handle_drop)
             except Exception:
                 pass
+
+        self.log_term("DuckyISO v7.1 Initialized with State Persistence & Icon Support.")
+
+    def load_config(self):
+        self.saved_settings = {}
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, 'r') as f:
+                    self.saved_settings = json.load(f)
+                    self.custom_output_dir = self.saved_settings.get("custom_output_dir", "")
+                    self.last_dir = self.saved_settings.get("last_dir", os.path.expanduser("~"))
+            except Exception:
+                pass
+
+    def save_config(self):
+        settings = {
+            "custom_output_dir": self.custom_output_dir,
+            "last_dir": self.last_dir,
+            "rename_mode": self.rename_mode_var.get(),
+            "pattern": self.pattern_var.get(),
+            "case": self.case_var.get(),
+            "format": self.format_var.get(),
+            "compression_level": self.level_var.get()
+        }
+        try:
+            with open(CONFIG_FILE, 'w') as f:
+                json.dump(settings, f, indent=4)
+        except Exception:
+            pass
+
+    def log_term(self, text):
+        self.term_box.config(state=tk.NORMAL)
+        self.term_box.insert(tk.END, f"> {text}\n")
+        self.term_box.see(tk.END)
+        self.term_box.config(state=tk.DISABLED)
 
     def apply_theme_colors(self):
         t = self.themes[self.current_theme_name]
@@ -205,8 +274,8 @@ class ISOCompressorApp:
             self.root.configure(bg=self.bg_color)
 
     def update_ttk_styles(self):
-        self.style.configure("Cyan.Horizontal.TProgressbar", thickness=14, background=self.cyan, troughcolor=self.bg_color, bordercolor=self.cyan)
-        self.style.configure("Pink.Horizontal.TProgressbar", thickness=14, background=self.pink, troughcolor=self.bg_color, bordercolor=self.pink)
+        self.style.configure("Cyan.Horizontal.TProgressbar", thickness=12, background=self.cyan, troughcolor=self.bg_color, bordercolor=self.cyan)
+        self.style.configure("Pink.Horizontal.TProgressbar", thickness=12, background=self.pink, troughcolor=self.bg_color, bordercolor=self.pink)
 
     def cycle_theme(self):
         names = list(self.themes.keys())
@@ -245,6 +314,7 @@ class ISOCompressorApp:
         self.btn_cancel.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
         self.lbl_pbar1.configure(bg=self.bg_color, fg=self.cyan)
         self.lbl_pbar2.configure(bg=self.bg_color, fg=self.pink)
+        self.log_term(f"Switched theme to {self.current_theme_name}")
 
     def _ensure_quack_downloaded(self):
         if not os.path.exists(self.sound_file):
@@ -262,41 +332,58 @@ class ISOCompressorApp:
                 pass
 
     def change_output_dir(self):
-        dir_path = filedialog.askdirectory(title="SELECT CUSTOM OUTPUT DIRECTORY")
+        dir_path = filedialog.askdirectory(initialdir=self.last_dir, title="SELECT CUSTOM OUTPUT DIRECTORY")
         if dir_path:
             self.custom_output_dir = dir_path
-            short_path = (dir_path[:35] + '...') if len(dir_path) > 35 else dir_path
+            self.last_dir = dir_path
+            short_path = (dir_path[:30] + '...') if len(dir_path) > 30 else dir_path
             self.lbl_out_title.config(text=f"OUTPUT: {short_path} (Custom)")
+            self.log_term(f"Output directory set to: {dir_path}")
+            self.save_config()
 
     def handle_drop(self, event):
         raw_data = event.data
         paths = self.root.tk.splitlist(raw_data)
         found_files = []
         valid_exts = ('.iso', '.cso', '.zso', '.dax')
+        
         for p in paths:
             if os.path.isdir(p):
+                self.last_dir = p
+                self.log_term(f"Scanning dropped directory: {p}")
                 for root_dir, _, files in os.walk(p):
                     for file in files:
                         if file.lower().endswith(valid_exts):
                             found_files.append(os.path.join(root_dir, file))
             elif os.path.isfile(p) and p.lower().endswith(valid_exts):
                 found_files.append(p)
+                self.last_dir = os.path.dirname(p)
                 
         if found_files:
             self.file_paths = found_files
             self._update_file_status()
+            self.log_term(f"Successfully loaded {len(found_files)} file(s) via Drag & Drop.")
+            self.save_config()
+        else:
+            messagebox.showwarning("INVALID DROP", "No valid PSP game images found in drop target.")
+            self.log_term("Warning: Drop target contained no valid PSP game images.")
 
     def browse_files(self):
-        paths = filedialog.askopenfilenames(filetypes=[("PSP Game Images", "*.iso *.cso *.zso *.dax"), ("All Files", "*.*")])
+        paths = filedialog.askopenfilenames(initialdir=self.last_dir, filetypes=[("PSP Game Images", "*.iso *.cso *.zso *.dax"), ("All Files", "*.*")])
         if paths:
             self.file_paths = list(paths)
+            self.last_dir = os.path.dirname(paths[0])
             self._update_file_status()
+            self.log_term(f"Loaded {len(paths)} file(s) via file selector.")
+            self.save_config()
 
     def browse_folder(self):
-        folder_path = filedialog.askdirectory(title="SELECT FOLDER CONTAINING GAMES")
+        folder_path = filedialog.askdirectory(initialdir=self.last_dir, title="SELECT FOLDER CONTAINING GAMES")
         if folder_path:
+            self.last_dir = folder_path
             found_files = []
             valid_exts = ('.iso', '.cso', '.zso', '.dax')
+            self.log_term(f"Scanning folder: {folder_path}")
             for root_dir, _, files in os.walk(folder_path):
                 for file in files:
                     if file.lower().endswith(valid_exts):
@@ -304,22 +391,29 @@ class ISOCompressorApp:
             if found_files:
                 self.file_paths = found_files
                 self._update_file_status()
+                self.log_term(f"Found and loaded {len(found_files)} game file(s) in folder.")
+                self.save_config()
+            else:
+                messagebox.showinfo("NO DATA FOUND", "No valid PSP game images located in target directory.")
+                self.log_term("Scan complete: No game files found.")
 
     def test_metadata(self):
-        """Diagnostic tool to verify PARAM.SFO extraction on selected files."""
         if not self.file_paths:
             messagebox.showwarning("NOTICE", "Please select at least one file first to test metadata.")
             return
         
         test_file = self.file_paths[0]
+        self.log_term(f"Testing metadata for: {os.path.basename(test_file)}")
         title, game_id = PSPImageReader.get_game_metadata(test_file)
         
         msg = f"File: {os.path.basename(test_file)}\n\n"
         if title:
             msg += f"Detected Title: {title}\n"
             msg += f"Detected Game ID: {game_id}"
+            self.log_term(f"Metadata OK -> Title: '{title}' [{game_id}]")
         else:
-            msg += "RESULT: Could not locate PARAM.SFO header. The file might use a non-standard layout."
+            msg += "RESULT: Could not locate PARAM.SFO header."
+            self.log_term(f"Metadata FAILED for {os.path.basename(test_file)}")
             
         messagebox.showinfo("Metadata Diagnostic", msg)
 
@@ -334,6 +428,11 @@ class ISOCompressorApp:
     def on_slider_change(self, val):
         self.lbl_slider.config(text=f"COMPRESSION_OVERRIDE: [ {val} ]")
         self.update_estimate()
+        self.save_config()
+
+    def on_format_change(self):
+        self.update_estimate()
+        self.save_config()
 
     def update_estimate(self, *_):
         if not self.file_paths or self.is_converting:
@@ -424,8 +523,10 @@ class ISOCompressorApp:
 
         rename_mode = self.rename_mode_var.get()
         if rename_mode == "NOW":
+            self.log_term("Starting instant batch rename protocol...")
             self.start_instant_rename()
         else:
+            self.log_term(f"Starting batch compression protocol (Format: {self.format_var.get()})...")
             self.start_conversion()
 
     def start_instant_rename(self):
@@ -454,6 +555,7 @@ class ISOCompressorApp:
                 
                 game_title, game_id = PSPImageReader.get_game_metadata(path)
                 if not game_title:
+                    self.log_term(f"SKIP: Could not read metadata for {filename}")
                     skipped_count += 1
                     continue
                 
@@ -468,10 +570,11 @@ class ISOCompressorApp:
                 if new_path != path:
                     os.rename(path, new_path)
                     renamed_count += 1
+                    self.log_term(f"RENAMED: '{filename}' -> '{new_name}'")
                 
                 self.progress_batch["value"] = idx + 1
-                self.lbl_status.config(text=f"RENAMED: {new_name}", fg=self.yellow)
-            except Exception:
+            except Exception as e:
+                self.log_term(f"ERROR renaming {filename}: {str(e)}")
                 skipped_count += 1
 
         self.root.after(0, lambda: self._finalize_rename_ui(renamed_count, skipped_count))
@@ -486,7 +589,11 @@ class ISOCompressorApp:
         self.btn_cancel.config(state=tk.DISABLED)
         self.lbl_status.config(text=f"RENAME COMPLETE: {count} UPDATED, {skipped} SKIPPED", fg=self.cyan)
         self._play_quack()
-        messagebox.showinfo("SUCCESS", f"Successfully renamed {count} game file(s).\nSkipped: {skipped} (metadata not found)")
+        
+        summary_msg = f"Rename Operation Finished!\n\nSuccessfully Renamed: {count}\nSkipped / Failed: {skipped}"
+        self.log_term(summary_msg.replace('\n', ' // '))
+        messagebox.showinfo("Operation Complete", summary_msg)
+        
         self.file_paths = []
         self.lbl_file.config(text="STATUS: AWAITING INPUT", fg="#555555")
 
@@ -518,13 +625,7 @@ class ISOCompressorApp:
                 out_dir = os.path.join(os.path.dirname(path), "compressed")
                 
             os.makedirs(out_dir, exist_ok=True)
-            
-            out_path = os.path.join(out_dir, base_name)
-            if os.path.exists(out_path) and out_path != path:
-                base_n, ext_n = os.path.splitext(base_name)
-                out_path = os.path.join(out_dir, f"{base_n}_{random.randint(100,999)}{ext_n}")
-
-            target_data.append((path, out_path))
+            target_data.append((path, os.path.join(out_dir, base_name)))
             
         self.is_converting = True
         self.cancel_flag = False
@@ -546,6 +647,7 @@ class ISOCompressorApp:
             self.cancel_flag = True
             self.btn_cancel.config(state=tk.DISABLED)
             self.lbl_status.config(text="SIGINT RECEIVED. PURGING...", fg=self.pink)
+            self.log_term("Abort signal sent by user. Cleaning up...")
 
     def update_ui_progress(self, current_file, total_files, current_block, total_blocks, filename, speed_str):
         self.progress_file["maximum"] = total_blocks
@@ -556,11 +658,28 @@ class ISOCompressorApp:
 
     def _run_batch_conversion(self, target_data, fmt, level):
         total_files = len(target_data)
+        success_count = 0
+        skip_count = 0
+        fail_count = 0
         
         for file_idx, (in_path, out_path) in enumerate(target_data):
             if self.cancel_flag: break
                 
             filename = os.path.basename(in_path)
+            out_filename = os.path.basename(out_path)
+            
+            # SMART RESUME CHECK
+            if os.path.exists(out_path):
+                try:
+                    if os.path.getsize(out_path) > 1024:
+                        self.log_term(f"RESUME: Skipping '{out_filename}' (already fully compressed).")
+                        skip_count += 1
+                        self.root.after(0, self.update_ui_progress, file_idx, total_files, 100, 100, filename, "SKIPPED")
+                        continue
+                except Exception:
+                    pass
+
+            self.log_term(f"Processing [{file_idx+1}/{total_files}]: {filename} -> {out_filename}")
             try:
                 reader = PSPImageReader(in_path)
                 num_blocks = reader.num_blocks
@@ -630,26 +749,35 @@ class ISOCompressorApp:
                         f_out.write(entry.to_bytes(4, 'little'))
                         
                 reader.close()
+                success_count += 1
+                self.log_term(f"Completed successfully: {filename}")
                 self.root.after(0, self.update_ui_progress, file_idx, total_files, num_blocks, num_blocks, filename, "DONE")
                 
             except Exception as e:
-                self.root.after(0, lambda err=str(e): messagebox.showerror("SYS_ERROR", f"CRASH ON {filename}:\n{err}"))
+                fail_count += 1
+                err_msg = str(e)
+                self.log_term(f"ERROR on {filename}: {err_msg}")
+                self.root.after(0, lambda err=err_msg: messagebox.showerror("SYS_ERROR", f"CRASH ON {filename}:\n{err}"))
                 if os.path.exists(out_path):
                     os.remove(out_path)
                     
             if self.cancel_flag and os.path.exists(out_path):
                 os.remove(out_path)
                 
-        self.root.after(0, self._finalize_ui)
+        self.root.after(0, lambda: self._finalize_ui(success_count, skip_count, fail_count))
             
-    def _finalize_ui(self):
+    def _finalize_ui(self, success_count=0, skip_count=0, fail_count=0):
         if self.cancel_flag:
             self.lbl_status.config(text="PROCESS ABORTED.", fg=self.pink)
+            self.log_term("Batch process was aborted by user.")
         else:
             self.lbl_status.config(text="> ALL PROCESSES COMPLETE <", fg=self.cyan)
             self.progress_batch["value"] = self.progress_batch["maximum"]
             self._play_quack()
-            messagebox.showinfo("SUCCESS", "ALL DATA BLOCKS ENCODED SUCCESSFULLY.")
+            
+            summary_msg = f"Batch Compression Finished!\n\nSuccessful: {success_count}\nSkipped (Already Done): {skip_count}\nFailed / Errored: {fail_count}"
+            self.log_term(summary_msg.replace('\n', ' // '))
+            messagebox.showinfo("Operation Complete", summary_msg)
             
         self.is_converting = False
         self.btn_convert.config(state=tk.NORMAL)
@@ -670,7 +798,6 @@ class PSPImageReader:
         self.file_size = self.f.tell()
         self.f.seek(0)
         
-        # Check extension and magic bytes
         ext = os.path.splitext(filepath)[1].lower()
         magic = self.f.read(4)
         
@@ -684,10 +811,9 @@ class PSPImageReader:
                 self.align = struct.unpack('B', self.f.read(1))[0]
                 self.f.read(2)
             else:
-                # Fallback header parameters for standard compressed images if magic header offset varies
                 self.f.seek(0)
-                self.f.read(4) # skip magic
-                self.f.read(4) # header size
+                self.f.read(4)
+                self.f.read(4)
                 self.total_size = struct.unpack('<Q', self.f.read(8))[0]
                 self.block_size = struct.unpack('<I', self.f.read(4))[0]
                 self.ver = 1
@@ -696,8 +822,7 @@ class PSPImageReader:
             self.num_blocks = (self.total_size + self.block_size - 1) // self.block_size
             self.index_table = []
             
-            # Read index table (block positions)
-            self.f.seek(24) # Standard CISO/ZISO header length
+            self.f.seek(24)
             for _ in range(self.num_blocks + 1):
                 data_bytes = self.f.read(4)
                 if len(data_bytes) < 4: break
@@ -725,7 +850,6 @@ class PSPImageReader:
                 if is_raw or start_pos == end_pos or not compressed_data:
                     return compressed_data
                 
-                # Check compression type
                 self.f.seek(0)
                 fmt_magic = self.f.read(4)
                 
@@ -752,7 +876,6 @@ class PSPImageReader:
         try:
             reader = PSPImageReader(filepath)
             full_data = bytearray()
-            # Scan initial sectors where ISO9660 filesystem and PARAM.SFO reside
             scan_limit = min(300, reader.num_blocks)
             for i in range(scan_limit):
                 full_data.extend(reader.read_block(i))
