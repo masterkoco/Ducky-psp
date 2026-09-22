@@ -23,10 +23,10 @@ try:
 except ImportError:
     zstd = None
 
-CONFIG_FILE = "duckyshrink_config.json"
-HISTORY_FILE = "duckyshrink_history.json"
-META_CACHE_FILE = "duckyshrink_meta_cache.json"
-UNDO_LOG_FILE = "duckyshrink_undo_log.json"
+CONFIG_FILE = "duckshrink_config.json"
+HISTORY_FILE = "duckshrink_history.json"
+META_CACHE_FILE = "duckshrink_meta_cache.json"
+UNDO_LOG_FILE = "duckshrink_undo_log.json"
 LOG_DIR = "logs"
 
 class DuckShrinkApp:
@@ -43,7 +43,7 @@ class DuckShrinkApp:
             for icon_name in ("icon.png", "icon.ico"):
                 icon_path = os.path.join(base_dir, icon_name)
                 if not os.path.exists(icon_path):
-                    icon_path = os.path.join("/opt/duckyshrink", icon_name)
+                    icon_path = os.path.join("/opt/duckshrink", icon_name)
                     
                 if os.path.exists(icon_path):
                     try:
