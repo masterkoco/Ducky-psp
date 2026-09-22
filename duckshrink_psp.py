@@ -25,7 +25,7 @@ try:
 except ImportError:
     zstd = None
 
-# Base path enforcement: Keep configs & logs inside the script's installation directory (/opt/duckshrink or local folder)
+# Base path enforcement: Keep configs & logs inside the script's installation directory
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(APP_DIR, "duckshrink_config.json")
 HISTORY_FILE = os.path.join(APP_DIR, "duckshrink_history.json")
@@ -36,8 +36,8 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor v9.7")
-        self.root.geometry("660x1120")
+        self.root.title("DuckShrink_PSP // Batch Compressor v9.8")
+        self.root.geometry("660x1160")
         
         os.makedirs(LOG_DIR, exist_ok=True)
         
@@ -114,7 +114,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.7]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.8]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         # Right Header Action Buttons (Themes & Golden Donate Button)
@@ -132,7 +132,7 @@ class DuckShrinkApp:
         self.lbl_drop_hint = tk.Label(root, text=">> DRAG & DROP FILES/FOLDERS OR USE SELECTORS", font=("Monospace", 8), bg=self.bg_color, fg=self.yellow)
         self.lbl_drop_hint.pack(pady=(0, 4))
         
-        # File/Folder Selection & Utility Buttons (Includes Log Clearer)
+        # File/Folder Selection & Utility Buttons (Includes Queue Manager & Log Clearer)
         self.frame_browse = tk.Frame(root, bg=self.bg_color)
         self.frame_browse.pack(pady=3)
         
@@ -143,6 +143,10 @@ class DuckShrinkApp:
         self.btn_browse_folder = tk.Button(self.frame_browse, text="[ FOLDER ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.pink, 
                                     activebackground=self.pink, activeforeground="black", command=self.browse_folder, relief=tk.SOLID, bd=1, padx=3, pady=3)
         self.btn_browse_folder.pack(side=tk.LEFT, padx=2)
+
+        self.btn_queue = tk.Button(self.frame_browse, text="[ QUEUE ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow, 
+                                   activebackground=self.yellow, activeforeground="black", command=self.open_queue_manager, relief=tk.SOLID, bd=1, padx=3, pady=3)
+        self.btn_queue.pack(side=tk.LEFT, padx=2)
 
         self.btn_refresh = tk.Button(self.frame_browse, text="[ REFRESH ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow, 
                                      activebackground=self.yellow, activeforeground="black", command=self.refresh_folder, relief=tk.SOLID, bd=1, padx=3, pady=3)
@@ -350,7 +354,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v9.7 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v9.8 Initialized successfully.")
 
     def load_config(self):
         self.saved_settings = {}
@@ -542,6 +546,7 @@ class DuckShrinkApp:
                 self.frame_browse.configure(bg=self.bg_color)
                 self.btn_browse_file.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
                 self.btn_browse_folder.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
+                self.btn_queue.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
                 self.btn_refresh.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
                 self.btn_undo.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
                 self.btn_clear_logs.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
@@ -595,6 +600,74 @@ class DuckShrinkApp:
         btn_apply = tk.Button(popup, text="[ APPLY THEME ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.cyan,
                               activebackground=self.cyan, activeforeground="black", command=apply_selected_theme, relief=tk.SOLID, bd=1, padx=10, pady=5)
         btn_apply.pack(pady=12)
+
+    def open_queue_manager(self):
+        """Opens a dedicated Queue Management window to inspect, filter, remove, or clear loaded files."""
+        if not self.file_paths:
+            messagebox.showwarning("QUEUE EMPTY", "No files currently loaded in the active queue.")
+            return
+
+        queue_win = tk.Toplevel(self.root)
+        queue_win.title("Queue Manager")
+        queue_win.geometry("540x480")
+        queue_win.configure(bg=self.bg_color)
+        queue_win.grab_set()
+
+        lbl_hdr = tk.Label(queue_win, text=f"ACTIVE BATCH QUEUE ({len(self.file_paths)} FILES):", font=("Monospace", 10, "bold"), bg=self.bg_color, fg=self.yellow)
+        lbl_hdr.pack(pady=10)
+
+        list_frame = tk.Frame(queue_win, bg=self.bg_color)
+        list_frame.pack(fill="both", expand=True, padx=20, pady=5)
+
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side=tk.RIGHT, fill="y")
+
+        q_listbox = tk.Listbox(list_frame, font=("Monospace", 8), bg=self.panel_bg, fg=self.text_color, 
+                               selectbackground=self.cyan, selectforeground="black", yscrollcommand=scrollbar.set, selectmode=tk.EXTENDED, bd=0, highlightthickness=0)
+        q_listbox.pack(side=tk.LEFT, fill="both", expand=True)
+        scrollbar.config(command=q_listbox.yview)
+
+        for p in self.file_paths:
+            q_listbox.insert(tk.END, p)
+
+        btn_frame = tk.Frame(queue_win, bg=self.bg_color)
+        btn_frame.pack(pady=12)
+
+        def remove_selected():
+            selected_indices = list(q_listbox.curselection())
+            if not selected_indices:
+                messagebox.showwarning("NOTICE", "Select one or more items in the list to remove.")
+                return
+            
+            for index in reversed(selected_indices):
+                q_listbox.delete(index)
+                del self.file_paths[index]
+                
+            self.process_loaded_files(self.file_paths)
+            self.log_term(f"Removed {len(selected_indices)} item(s) from batch queue.")
+
+        def clear_queue():
+            if messagebox.askyesno("CLEAR QUEUE", "Are you sure you want to clear all items from the queue?"):
+                self.file_paths = []
+                q_listbox.delete(0, tk.END)
+                self.lbl_file.config(text="STATUS: AWAITING INPUT", fg="#555555")
+                self.lbl_status.config(text="SYSTEM IDLE", fg=self.text_color)
+                self.btn_compress.config(state=tk.DISABLED)
+                self.btn_rename.config(state=tk.DISABLED)
+                self.log_term("Batch queue cleared.")
+                queue_win.destroy()
+
+        btn_remove = tk.Button(btn_frame, text="[ REMOVE SELECTED ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.pink,
+                               activebackground=self.pink, activeforeground="black", command=remove_selected, relief=tk.SOLID, bd=1, padx=6, pady=4)
+        btn_remove.pack(side=tk.LEFT, padx=5)
+
+        btn_clear = tk.Button(btn_frame, text="[ CLEAR ALL ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.pink,
+                              activebackground=self.pink, activeforeground="black", command=clear_queue, relief=tk.SOLID, bd=1, padx=6, pady=4)
+        btn_clear.pack(side=tk.LEFT, padx=5)
+
+        btn_close = tk.Button(btn_frame, text="[ CLOSE ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.cyan,
+                              activebackground=self.cyan, activeforeground="black", command=queue_win.destroy, relief=tk.SOLID, bd=1, padx=6, pady=4)
+        btn_close.pack(side=tk.LEFT, padx=5)
 
     def _ensure_quack_downloaded(self):
         if not os.path.exists(self.sound_file):
