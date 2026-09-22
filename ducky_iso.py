@@ -26,7 +26,7 @@ CONFIG_FILE = "ducky_config.json"
 class ISOCompressorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckyISO // PSP Batch Compressor v7.2")
+        self.root.title("DuckyISO // PSP Batch Compressor v7.3")
         self.root.geometry("640x930")
         
         # Robust Window / Taskbar Icon Loader for Linux Mint
@@ -87,7 +87,7 @@ class ISOCompressorApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        tk.Label(header_frame, text="DUCKY_ISO [v7.2]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan).pack(side=tk.LEFT)
+        tk.Label(header_frame, text="DUCKY_ISO [v7.3]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan).pack(side=tk.LEFT)
         
         # Theme Switcher Button
         self.btn_theme = tk.Button(header_frame, text="THEME: CYBERPUNK", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow,
@@ -234,7 +234,7 @@ class ISOCompressorApp:
             except Exception:
                 pass
 
-        self.log_term("DuckyISO v7.2 Initialized with Explicit Icon Binding.")
+        self.log_term("DuckyISO v7.3 Initialized with Enhanced CSO/ISO Reader.")
 
     def load_config(self):
         self.saved_settings = {}
@@ -797,7 +797,7 @@ class ISOCompressorApp:
 
 
 class PSPImageReader:
-    """Extension-aware parser that correctly decodes raw ISOs and compressed CSO/ZSO/DAX formats to find PARAM.SFO."""
+    """Robust parser that correctly decodes raw ISOs and compressed CSO/ZSO images to find PARAM.SFO."""
     def __init__(self, filepath):
         self.filepath = filepath
         self.f = open(filepath, 'rb')
@@ -805,31 +805,20 @@ class PSPImageReader:
         self.file_size = self.f.tell()
         self.f.seek(0)
         
-        ext = os.path.splitext(filepath)[1].lower()
         magic = self.f.read(4)
-        
-        if magic in (b'CISO', b'ZISO') or ext in ('.cso', '.zso', '.dax'):
+        if magic in (b'CISO', b'ZISO'):
             self.is_compressed = True
-            if magic in (b'CISO', b'ZISO'):
-                header_size = struct.unpack('<I', self.f.read(4))[0]
-                self.total_size = struct.unpack('<Q', self.f.read(8))[0]
-                self.block_size = struct.unpack('<I', self.f.read(4))[0]
-                self.ver = struct.unpack('B', self.f.read(1))[0]
-                self.align = struct.unpack('B', self.f.read(1))[0]
-                self.f.read(2)
-            else:
-                self.f.seek(0)
-                self.f.read(4)
-                self.f.read(4)
-                self.total_size = struct.unpack('<Q', self.f.read(8))[0]
-                self.block_size = struct.unpack('<I', self.f.read(4))[0]
-                self.ver = 1
-                self.align = 0
-                
+            header_size = struct.unpack('<I', self.f.read(4))[0]
+            self.total_size = struct.unpack('<Q', self.f.read(8))[0]
+            self.block_size = struct.unpack('<I', self.f.read(4))[0]
+            self.ver = struct.unpack('B', self.f.read(1))[0]
+            self.align = struct.unpack('B', self.f.read(1))[0]
+            self.f.read(2)
+            
             self.num_blocks = (self.total_size + self.block_size - 1) // self.block_size
             self.index_table = []
             
-            self.f.seek(24)
+            self.f.seek(24) # Standard CISO/ZISO header offset
             for _ in range(self.num_blocks + 1):
                 data_bytes = self.f.read(4)
                 if len(data_bytes) < 4: break
@@ -849,8 +838,11 @@ class PSPImageReader:
                 entry = self.index_table[idx]
                 next_entry = self.index_table[idx + 1]
                 is_raw = (entry & 0x80000000) != 0
-                start_pos = entry & 0x7FFFFFFF
-                end_pos = next_entry & 0x7FFFFFFF
+                start_pos = (entry & 0x7FFFFFFF) << self.align
+                end_pos = (next_entry & 0x7FFFFFFF) << self.align
+                
+                if start_pos == end_pos or start_pos >= self.file_size:
+                    return b'\x00' * self.block_size
                 
                 self.f.seek(start_pos)
                 compressed_data = self.f.read(end_pos - start_pos)
@@ -860,12 +852,12 @@ class PSPImageReader:
                 self.f.seek(0)
                 fmt_magic = self.f.read(4)
                 
-                if fmt_magic == b'CISO' or self.filepath.lower().endswith('.cso'):
+                if fmt_magic == b'CISO':
                     try:
                         return zlib.decompress(compressed_data, wbits=-15)
                     except Exception:
                         return compressed_data
-                elif fmt_magic == b'ZISO' or self.filepath.lower().endswith('.zso'):
+                elif fmt_magic == b'ZISO':
                     if zstd is not None:
                         try:
                             d = zstd.ZstdDecompressor()
@@ -879,11 +871,12 @@ class PSPImageReader:
 
     @staticmethod
     def get_game_metadata(filepath):
-        """Extension-aware metadata scanner that parses internal PARAM.SFO from ISO, CSO, or ZSO files."""
+        """Scans ISO and compressed CSO/ZSO sectors to parse the internal PARAM.SFO file for game title and ID."""
         try:
             reader = PSPImageReader(filepath)
             full_data = bytearray()
-            scan_limit = min(300, reader.num_blocks)
+            # Scan initial sectors where ISO9660 volume descriptors and PARAM.SFO reside
+            scan_limit = min(350, reader.num_blocks)
             for i in range(scan_limit):
                 full_data.extend(reader.read_block(i))
             reader.close()
