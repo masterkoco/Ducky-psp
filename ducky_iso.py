@@ -26,19 +26,26 @@ CONFIG_FILE = "ducky_config.json"
 class ISOCompressorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckyISO // PSP Batch Compressor v7.1")
+        self.root.title("DuckyISO // PSP Batch Compressor v7.2")
         self.root.geometry("640x930")
         
-        # Set Window / Taskbar Icon for Linux/Windows
-        for icon_name in ("icon.png", "icon.ico"):
-            icon_path = os.path.join(os.path.dirname(__file__), icon_name)
-            if os.path.exists(icon_path):
-                try:
-                    img = tk.PhotoImage(file=icon_path)
-                    self.root.iconphoto(True, img)
-                    break
-                except Exception:
-                    pass
+        # Robust Window / Taskbar Icon Loader for Linux Mint
+        try:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            for icon_name in ("icon.png", "icon.ico"):
+                icon_path = os.path.join(base_dir, icon_name)
+                if not os.path.exists(icon_path):
+                    icon_path = os.path.join("/opt/duckyiso", icon_name)
+                    
+                if os.path.exists(icon_path):
+                    try:
+                        img = tk.PhotoImage(file=icon_path)
+                        self.root.iconphoto(True, img)
+                        break
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
         # Color Palettes (Cyberpunk Themes)
         self.themes = {
@@ -80,7 +87,7 @@ class ISOCompressorApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        tk.Label(header_frame, text="DUCKY_ISO [v7.1]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan).pack(side=tk.LEFT)
+        tk.Label(header_frame, text="DUCKY_ISO [v7.2]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan).pack(side=tk.LEFT)
         
         # Theme Switcher Button
         self.btn_theme = tk.Button(header_frame, text="THEME: CYBERPUNK", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow,
@@ -227,7 +234,7 @@ class ISOCompressorApp:
             except Exception:
                 pass
 
-        self.log_term("DuckyISO v7.1 Initialized with State Persistence & Icon Support.")
+        self.log_term("DuckyISO v7.2 Initialized with Explicit Icon Binding.")
 
     def load_config(self):
         self.saved_settings = {}
