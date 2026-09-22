@@ -35,7 +35,7 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor & PS1 Eboot v10.5")
+        self.root.title("DuckShrink_PSP // Batch Compressor & PS1 Eboot v10.6")
         self.root.geometry("660x1320")
         
         os.makedirs(LOG_DIR, exist_ok=True)
@@ -86,16 +86,16 @@ class DuckShrinkApp:
             }
         }
         self.current_theme_name = "Teal & Cyberpunk"
-        self.app_mode = "PSP" # "PSP" or "PS1"
+        self.app_mode = "PSP" 
         self.apply_theme_colors()
         
         self.file_paths = []
         self.ps1_discs = []
         
         # PS1 Custom Artwork Paths
-        self.ps1_icon0 = "" # Icon (144x80 PNG)
-        self.ps1_pic0 = ""  # Banner (310x180 PNG)
-        self.ps1_pic1 = ""  # Wallpaper (480x272 PNG)
+        self.ps1_icon0 = ""
+        self.ps1_pic0 = ""
+        self.ps1_pic1 = ""
         
         self.custom_output_dir = ""
         self.last_dir = os.path.expanduser("~")
@@ -118,7 +118,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.5]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.6]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         header_right_frame = tk.Frame(header_frame, bg=self.bg_color)
@@ -185,14 +185,6 @@ class DuckShrinkApp:
                                         activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=5, pady=2)
         self.btn_change_out.pack(side=tk.RIGHT, padx=2)
 
-        # Dynamic Mode Panels
-        self.dynamic_container = tk.Frame(root, bg=self.bg_color)
-        self.dynamic_container.pack(fill="x", padx=30, pady=2)
-
-        self.build_psp_mode_panel()
-        self.build_ps1_mode_panel()
-        self.update_mode_visibility()
-
         # Format Selection & Multi-Threading Config Frame
         self.frame_format = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=2, padx=8, pady=4)
         self.frame_format.pack(pady=4, fill="x", padx=30)
@@ -242,7 +234,7 @@ class DuckShrinkApp:
         self.lbl_estimate = tk.Label(root, text="ESTIMATED YIELD: -- ?", font=("Monospace", 10, "bold"), bg=self.bg_color, fg=self.yellow)
         self.lbl_estimate.pack(pady=3)
         
-        # Action Buttons
+        # Action Buttons (Defined BEFORE update_mode_visibility)
         self.frame_actions = tk.Frame(root, bg=self.bg_color)
         self.frame_actions.pack(pady=4)
         
@@ -257,6 +249,14 @@ class DuckShrinkApp:
         self.btn_cancel = tk.Button(self.frame_actions, text="[ ABORT ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.pink, 
                                     activebackground=self.pink, activeforeground="black", command=self.cancel_action, relief=tk.SOLID, bd=1, padx=8, pady=5, state=tk.DISABLED)
         self.btn_cancel.pack(side=tk.LEFT, padx=4)
+
+        # Dynamic Mode Panels & Container
+        self.dynamic_container = tk.Frame(root, bg=self.bg_color)
+        self.dynamic_container.pack(fill="x", padx=30, pady=2)
+
+        self.build_psp_mode_panel()
+        self.build_ps1_mode_panel()
+        self.update_mode_visibility() # Safe to call now since btn_compress exists
         
         # Progress Tracking
         self.lbl_status = tk.Label(root, text="SYSTEM IDLE", bg=self.bg_color, fg=self.text_color, font=("Monospace", 9, "bold"))
@@ -294,7 +294,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v10.5 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v10.6 Initialized successfully.")
 
     def build_psp_mode_panel(self):
         self.panel_psp = tk.Frame(self.dynamic_container, bg=self.bg_color)
@@ -368,7 +368,6 @@ class DuckShrinkApp:
         self.btn_ps1_select = tk.Button(ps1_btn_row, text="[ SELECT PS1 CUE/BIN ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.cyan, command=self.browse_ps1_files, relief=tk.SOLID, bd=1, padx=6, pady=3)
         self.btn_ps1_select.pack(side=tk.LEFT, padx=2)
 
-        # Dedicated PS1 Artwork Customizer Box
         art_box = tk.LabelFrame(self.frame_ps1_hub, text=" Custom Artwork Manager (PS1 Only) ", bg=self.panel_bg, fg=self.cyan, font=("Monospace", 8, "bold"), padx=5, pady=5)
         art_box.pack(fill="x", pady=4)
 
@@ -754,7 +753,6 @@ class DuckShrinkApp:
         success, failed = 0, 0
         total_files = len(self.ps1_discs)
         
-        # Load Custom Artwork Bytes if present
         icon0_data = open(self.ps1_icon0, 'rb').read() if self.ps1_icon0 and os.path.exists(self.ps1_icon0) else b''
         pic0_data = open(self.ps1_pic0, 'rb').read() if self.ps1_pic0 and os.path.exists(self.ps1_pic0) else b''
         pic1_data = open(self.ps1_pic1, 'rb').read() if self.ps1_pic1 and os.path.exists(self.ps1_pic1) else b''
@@ -764,7 +762,6 @@ class DuckShrinkApp:
             if self.cancel_flag: break
             filename = os.path.basename(path)
             
-            # Explicit Progress Counter Logging
             counter_str = f"[{idx + 1}/{total_files}]"
             self.log_term(f"Converting PS1 Disc {counter_str}: {filename} -> EBOOT.PBP")
             self.lbl_status.config(text=f"CONVERTING PS1 {counter_str}: {filename}", fg=self.cyan)
@@ -779,7 +776,6 @@ class DuckShrinkApp:
                 
                 eboot_path = os.path.join(out_dir, f"{base_name}_EBOOT.PBP")
                 
-                # Calculate PBP section offsets
                 header_size = 40
                 off_sfo = header_size
                 off_icon0 = off_sfo + len(sfo_data)
@@ -791,17 +787,14 @@ class DuckShrinkApp:
                 off_data_psar = off_data_psp
                 
                 with open(eboot_path, 'wb') as f_out:
-                    # Write PBP Magic Header & Offsets
                     f_out.write(b'\x50\x42\x50\x00\x00\x01\x00\x00')
                     f_out.write(struct.pack('<IIIIIIII', off_sfo, off_icon0, off_icon1, off_pic0, off_pic1, off_snd0, off_data_psp, off_data_psar))
                     
-                    # Write Embedded Metadata & Custom Artwork Sections
                     f_out.write(sfo_data)
                     if icon0_data: f_out.write(icon0_data)
                     if pic0_data: f_out.write(pic0_data)
                     if pic1_data: f_out.write(pic1_data)
                     
-                    # Stream Source Disc Image into PSAR Block
                     with open(path, 'rb') as f_in:
                         while True:
                             chunk = f_in.read(1024 * 1024)
