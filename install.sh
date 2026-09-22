@@ -10,11 +10,10 @@ sudo apt-get install -y python3 python3-tk python3-zstandard xdotool curl
 echo "[*] Setting up installation directories..."
 sudo mkdir -p /opt/duckshrink
 
-echo "[*] Downloading DuckShrink_PSP script from GitHub..."
+echo "[*] Downloading DuckShrink_PSP files from GitHub..."
 sudo curl -s -o /opt/duckshrink/duckshrink_psp.py https://raw.githubusercontent.com/masterkoco/DuckyShrink_psp/refs/heads/main/duckshrink_psp.py
-
-# Optional: Download icon if you have it in your repo
 sudo curl -s -o /opt/duckshrink/icon.png https://raw.githubusercontent.com/masterkoco/DuckyShrink_psp/refs/heads/main/icon.png || true
+sudo curl -s -o /opt/duckshrink/quack.ogg https://raw.githubusercontent.com/masterkoco/DuckyShrink_psp/refs/heads/main/quack.ogg || true
 
 # Create a convenient executable command wrapper in /usr/local/bin
 echo "[*] Creating terminal shortcut..."
