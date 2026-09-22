@@ -10,8 +10,10 @@ import subprocess
 import urllib.request
 import urllib.parse
 import datetime
+import webbrowser
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -32,8 +34,8 @@ LOG_DIR = "logs"
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor v9.3")
-        self.root.geometry("660x1080")
+        self.root.title("DuckShrink_PSP // Batch Compressor v9.6")
+        self.root.geometry("660x1120")
         
         os.makedirs(LOG_DIR, exist_ok=True)
         
@@ -111,18 +113,25 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.3]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.6]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
-        # Theme Selector Popup Button
-        self.btn_theme = tk.Button(header_frame, text="[ THEMES ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow,
+        # Right Header Action Buttons (Themes & Golden Donate Button)
+        header_right_frame = tk.Frame(header_frame, bg=self.bg_color)
+        header_right_frame.pack(side=tk.RIGHT)
+
+        self.btn_donate = tk.Button(header_right_frame, text="[ 💛 DONATE ]", font=("Monospace", 8, "bold"), bg="#FFD700", fg="black",
+                                    activebackground="#FFF066", activeforeground="black", command=self.open_donation_link, relief=tk.SOLID, bd=1, padx=6, pady=2)
+        self.btn_donate.pack(side=tk.LEFT, padx=4)
+
+        self.btn_theme = tk.Button(header_right_frame, text="[ THEMES ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow,
                                    activebackground=self.yellow, activeforeground="black", command=self.open_theme_selector, relief=tk.SOLID, bd=1, padx=6, pady=2)
-        self.btn_theme.pack(side=tk.RIGHT)
+        self.btn_theme.pack(side=tk.LEFT, padx=4)
         
         self.lbl_drop_hint = tk.Label(root, text=">> DRAG & DROP FILES/FOLDERS OR USE SELECTORS", font=("Monospace", 8), bg=self.bg_color, fg=self.yellow)
         self.lbl_drop_hint.pack(pady=(0, 4))
         
-        # File/Folder Selection & Utility Buttons
+        # File/Folder Selection & Utility Buttons (Includes Log Clearer)
         self.frame_browse = tk.Frame(root, bg=self.bg_color)
         self.frame_browse.pack(pady=3)
         
@@ -141,6 +150,10 @@ class DuckShrinkApp:
         self.btn_undo = tk.Button(self.frame_browse, text="[ UNDO ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.pink, 
                                   activebackground=self.pink, activeforeground="black", command=self.undo_rename, relief=tk.SOLID, bd=1, padx=3, pady=3)
         self.btn_undo.pack(side=tk.LEFT, padx=2)
+
+        self.btn_clear_logs = tk.Button(self.frame_browse, text="[ CLEAR LOGS ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.pink, 
+                                        activebackground=self.pink, activeforeground="black", command=self.clear_all_logs, relief=tk.SOLID, bd=1, padx=3, pady=3)
+        self.btn_clear_logs.pack(side=tk.LEFT, padx=2)
 
         self.btn_open_logs = tk.Button(self.frame_browse, text="[ LOGS ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.cyan, 
                                        activebackground=self.cyan, activeforeground="black", command=self.open_logs_folder, relief=tk.SOLID, bd=1, padx=3, pady=3)
@@ -233,18 +246,38 @@ class DuckShrinkApp:
                                            activebackground=self.yellow, activeforeground="black", command=self.start_online_rename, relief=tk.SOLID, bd=1, padx=6, pady=3)
         self.btn_online_rename.pack(side=tk.LEFT, padx=3)
 
-        # Format Selection
+        # Format Selection & Multi-Threading Config Frame
         self.frame_format = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=1, padx=8, pady=4)
         self.frame_format.pack(pady=4, fill="x", padx=30)
         
-        self.lbl_fmt_title = tk.Label(self.frame_format, text="OUTPUT_FORMAT:", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
+        fmt_top_frame = tk.Frame(self.frame_format, bg=self.panel_bg)
+        fmt_top_frame.pack(fill="x", pady=2)
+
+        self.lbl_fmt_title = tk.Label(fmt_top_frame, text="OUTPUT_FORMAT:", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
         self.lbl_fmt_title.pack(side=tk.LEFT, padx=6)
         
         self.format_var = tk.StringVar(value=self.saved_settings.get("format", "ZSO"))
-        self.rb_zso = tk.Radiobutton(self.frame_format, text="ZSO (ZSTD)", variable=self.format_var, value="ZSO", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, activebackground=self.panel_bg, activeforeground=self.cyan, font=("Monospace", 9, "bold"), command=self.on_format_change)
+        self.rb_zso = tk.Radiobutton(fmt_top_frame, text="ZSO (ZSTD)", variable=self.format_var, value="ZSO", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, activebackground=self.panel_bg, activeforeground=self.cyan, font=("Monospace", 9, "bold"), command=self.on_format_change)
         self.rb_zso.pack(side=tk.LEFT, padx=4)
-        self.rb_cso = tk.Radiobutton(self.frame_format, text="CSO (ZLIB)", variable=self.format_var, value="CSO", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, activebackground=self.panel_bg, activeforeground=self.cyan, font=("Monospace", 9, "bold"), command=self.on_format_change)
+        self.rb_cso = tk.Radiobutton(fmt_top_frame, text="CSO (ZLIB)", variable=self.format_var, value="CSO", bg=self.panel_bg, fg=self.text_color, selectcolor=self.bg_color, activebackground=self.panel_bg, activeforeground=self.cyan, font=("Monospace", 9, "bold"), command=self.on_format_change)
         self.rb_cso.pack(side=tk.LEFT, padx=4)
+
+        # Multi-Thread Workers Selector
+        thread_sub_frame = tk.Frame(self.frame_format, bg=self.panel_bg)
+        thread_sub_frame.pack(fill="x", pady=4)
+
+        self.lbl_threads = tk.Label(thread_sub_frame, text="Parallel Threads:", bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8, "bold"))
+        self.lbl_threads.pack(side=tk.LEFT, padx=6)
+
+        default_threads = str(min(os.cpu_count() or 4, 8))
+        self.threads_var = tk.StringVar(value=self.saved_settings.get("threads", default_threads))
+        thread_options = ["1", "2", "4", "6", "8", "12", "16"]
+        self.threads_dropdown = ttk.Combobox(thread_sub_frame, textvariable=self.threads_var, values=thread_options, state="readonly", width=5)
+        self.threads_dropdown.pack(side=tk.LEFT, padx=4)
+        self.threads_dropdown.bind("<<ComboboxSelected>>", lambda e: self.save_config())
+
+        self.lbl_thread_hint = tk.Label(thread_sub_frame, text="(Compresses multiple games at once)", bg=self.panel_bg, fg="#888888", font=("Monospace", 7))
+        self.lbl_thread_hint.pack(side=tk.LEFT, padx=4)
         
         # Compression Slider
         self.frame_slider = tk.Frame(root, bg=self.bg_color)
@@ -301,7 +334,7 @@ class DuckShrinkApp:
         self.lbl_term_title = tk.Label(self.term_frame, text="[ TERMINAL OUTPUT LOG ]", bg="#000000", fg=self.cyan, font=("Monospace", 8, "bold"))
         self.lbl_term_title.pack(anchor="w", padx=5)
         
-        self.term_box = tk.Text(self.term_frame, bg="#000000", fg="#00FF66", font=("Monospace", 8), height=6, bd=0, highlightthickness=0)
+        self.term_box = tk.Text(self.term_frame, bg="#000000", fg="#00FF66", font=("Monospace", 8), height=5, bd=0, highlightthickness=0)
         self.term_box.pack(side=tk.LEFT, fill="both", expand=True, padx=5, pady=2)
         self.term_box.config(state=tk.DISABLED)
         
@@ -316,7 +349,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v9.3 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v9.6 Initialized successfully.")
 
     def load_config(self):
         self.saved_settings = {}
@@ -338,6 +371,7 @@ class DuckShrinkApp:
             "case": self.case_var.get(),
             "format": self.format_var.get(),
             "compression_level": self.level_var.get(),
+            "threads": self.threads_var.get(),
             "theme": self.current_theme_name
         }
         try:
@@ -406,6 +440,21 @@ class DuckShrinkApp:
         except Exception:
             pass
 
+    def clear_all_logs(self):
+        if messagebox.askyesno("CLEAR LOGS", "Are you sure you want to clear the terminal window and all log files?"):
+            self.term_box.config(state=tk.NORMAL)
+            self.term_box.delete("1.0", tk.END)
+            self.term_box.config(state=tk.DISABLED)
+            
+            for log_filename in ("activity.log", "errors.log"):
+                log_path = os.path.join(LOG_DIR, log_filename)
+                try:
+                    if os.path.exists(log_path):
+                        open(log_path, 'w').close()
+                except Exception:
+                    pass
+            self.log_term("All activity logs and terminal history cleared.")
+
     def open_logs_folder(self):
         try:
             abs_path = os.path.abspath(LOG_DIR)
@@ -413,6 +462,13 @@ class DuckShrinkApp:
             self.log_term(f"Opened logs directory: {abs_path}")
         except Exception as e:
             messagebox.showerror("SYS_ERROR", f"Could not open logs folder:\n{str(e)}")
+
+    def open_donation_link(self):
+        try:
+            webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=LUT2LHRKQ27LN")
+            self.log_term("Opened donation page in browser.")
+        except Exception as e:
+            self.log_term(f"Could not open browser for donation: {str(e)}", is_error=True)
 
     def log_term(self, text, is_error=False):
         self.term_box.config(state=tk.NORMAL)
@@ -479,6 +535,7 @@ class DuckShrinkApp:
                         pass
                         
                 self.lbl_title.configure(bg=self.bg_color, fg=self.cyan)
+                self.btn_donate.configure(bg="#FFD700", fg="black")
                 self.btn_theme.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
                 self.lbl_drop_hint.configure(bg=self.bg_color, fg=self.yellow)
                 self.frame_browse.configure(bg=self.bg_color)
@@ -486,6 +543,7 @@ class DuckShrinkApp:
                 self.btn_browse_folder.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
                 self.btn_refresh.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
                 self.btn_undo.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
+                self.btn_clear_logs.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
                 self.btn_open_logs.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
                 self.btn_test_sound.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
                 
@@ -510,6 +568,8 @@ class DuckShrinkApp:
                 self.lbl_fmt_title.configure(bg=self.panel_bg, fg=self.yellow)
                 self.rb_zso.configure(bg=self.panel_bg, fg=self.text_color, activebackground=self.panel_bg, activeforeground=self.cyan)
                 self.rb_cso.configure(bg=self.panel_bg, fg=self.text_color, activebackground=self.panel_bg, activeforeground=self.cyan)
+                self.lbl_threads.configure(bg=self.panel_bg, fg=self.text_color)
+                self.lbl_thread_hint.configure(bg=self.panel_bg, fg="#888888")
                 
                 self.frame_slider.configure(bg=self.bg_color)
                 self.lbl_slider.configure(bg=self.bg_color, fg=self.text_color)
@@ -642,13 +702,30 @@ class DuckShrinkApp:
         total_size_bytes = sum(os.path.getsize(p) for p in file_list)
         total_size_mb = total_size_bytes / (1024 * 1024)
 
+        # Automatically check output folders for completed/existing compressed files
+        fmt = self.format_var.get().lower()
+        auto_detected_count = 0
+        for p in file_list:
+            base_ext = os.path.splitext(p)[1].lower()
+            out_ext = f".{fmt}"
+            base_name = os.path.basename(p).replace(base_ext, out_ext)
+            out_dir = self.custom_output_dir if self.custom_output_dir else os.path.join(os.path.dirname(p), "compressed")
+            out_path = os.path.join(out_dir, base_name)
+            
+            if (os.path.exists(out_path) and os.path.getsize(out_path) > 1024) or (out_path in self.completed_history):
+                self.completed_history.add(out_path)
+                auto_detected_count += 1
+        if auto_detected_count > 0:
+            self.save_history()
+            self.log_term(f"Output folder scan: Auto-detected {auto_detected_count} already compressed file(s).")
+
         self.lbl_file.config(text=f"LOADED: {total} NODE(S) | {total_size_mb:.2f} MB", fg=self.cyan)
         if not self.custom_output_dir and self.file_paths:
             self.lbl_out_title.config(text=f"OUTPUT: .../compressed (Auto)")
         self.lbl_status.config(text=f"STATUS: READY ({total} GAMES LOADED)", fg=self.cyan)
         self.btn_compress.config(state=tk.NORMAL)
         self.btn_rename.config(state=tk.NORMAL)
-        self.log_term(f"Successfully loaded {total} game file(s) instantly (Metadata scanning deferred).")
+        self.log_term(f"Successfully loaded {total} game file(s) instantly.")
         self.update_estimate()
 
     def test_metadata(self):
@@ -1138,7 +1215,8 @@ class DuckShrinkApp:
         self.progress_batch["maximum"] = len(target_data)
         self.progress_batch["value"] = 0
         
-        threading.Thread(target=self._run_batch_compression, args=(target_data, fmt, self.level_var.get()), daemon=True).start()
+        max_workers = int(self.threads_var.get())
+        threading.Thread(target=self._run_multithreaded_compression, args=(target_data, fmt, self.level_var.get(), max_workers), daemon=True).start()
 
     def cancel_action(self):
         if self.is_converting:
@@ -1147,34 +1225,32 @@ class DuckShrinkApp:
             self.lbl_status.config(text="SIGINT RECEIVED. PURGING...", fg=self.pink)
             self.log_term("Abort signal sent by user. Cleaning up...")
 
-    def update_ui_progress(self, current_file, total_files, current_block, total_blocks, filename, speed_str):
-        self.progress_file["maximum"] = total_blocks
-        self.progress_file["value"] = current_block
-        self.progress_batch["value"] = current_file
-        percent = (current_block / total_blocks) * 100 if total_blocks > 0 else 0
-        self.lbl_status.config(text=f"[{current_file + 1}/{total_files}] {filename} // {percent:.1f}% ({speed_str})", fg=self.cyan)
-
-    def _run_batch_compression(self, target_data, fmt, level):
+    def _run_multithreaded_compression(self, target_data, fmt, level, max_workers):
         total_files = len(target_data)
         success_count = 0
         skip_count = 0
         fail_count = 0
-        
-        for file_idx, (in_path, out_path) in enumerate(target_data):
-            if self.cancel_flag: break
-                
+        completed_lock = threading.Lock()
+
+        def compress_single_file(item):
+            nonlocal success_count, skip_count, fail_count
+            if self.cancel_flag: return
+            
+            in_path, out_path = item
             filename = os.path.basename(in_path)
             out_filename = os.path.basename(out_path)
             
+            # Robust Smart Skip Check: Check history or if destination file already exists and is non-empty (> 1024 bytes)
             if out_path in self.completed_history or (os.path.exists(out_path) and os.path.getsize(out_path) > 1024):
-                self.log_term(f"RESUME: Skipping '{out_filename}' (already fully compressed).")
-                skip_count += 1
-                self.completed_history.add(out_path)
-                self.save_history()
-                self.root.after(0, self.update_ui_progress, file_idx, total_files, 100, 100, filename, "SKIPPED")
-                continue
+                with completed_lock:
+                    skip_count += 1
+                    self.completed_history.add(out_path)
+                    self.save_history()
+                    self.progress_batch["value"] += 1
+                self.log_term(f"RESUME: Skipping '{out_filename}' (already compressed / exists).")
+                return
 
-            self.log_term(f"Processing [{file_idx+1}/{total_files}]: {filename} -> {out_filename}")
+            self.log_term(f"Processing: {filename} -> {out_filename}")
             try:
                 reader = PSPImageReader(in_path)
                 num_blocks = reader.num_blocks
@@ -1193,9 +1269,6 @@ class DuckShrinkApp:
                 index_table = []
                 write_pos = header_size + index_size
                 
-                start_time = time.time()
-                bytes_processed = 0
-                
                 with open(out_path, 'wb') as f_out:
                     f_out.seek(write_pos) 
                     
@@ -1203,7 +1276,6 @@ class DuckShrinkApp:
                         if self.cancel_flag: break
                         data = reader.read_block(i)
                         if not data: break
-                        bytes_processed += len(data)
                         
                         if fmt == 'CSO':
                             comp_obj = zlib.compressobj(level=c_level, method=zlib.DEFLATED, wbits=-15)
@@ -1222,15 +1294,10 @@ class DuckShrinkApp:
                             
                         index_table.append(entry)
                         
-                        if i % 300 == 0 or i == num_blocks - 1:
-                            elapsed = time.time() - start_time
-                            speed = (bytes_processed / (1024 * 1024)) / elapsed if elapsed > 0 else 0
-                            speed_str = f"{speed:.1f} MB/s"
-                            self.root.after(0, self.update_ui_progress, file_idx, total_files, i, num_blocks, filename, speed_str)
-                        
                     if self.cancel_flag: 
                         reader.close()
-                        break
+                        if os.path.exists(out_path): os.remove(out_path)
+                        return
                         
                     index_table.append(write_pos)
                     f_out.seek(0)
@@ -1244,23 +1311,28 @@ class DuckShrinkApp:
                         f_out.write(entry.to_bytes(4, 'little'))
                         
                 reader.close()
-                success_count += 1
-                self.completed_history.add(out_path)
-                self.save_history()
+                with completed_lock:
+                    success_count += 1
+                    self.completed_history.add(out_path)
+                    self.save_history()
+                    self.progress_batch["value"] += 1
                 self.log_term(f"Completed successfully: {filename}")
                 self.log_to_file("COMPRESS", f"Successfully compressed '{filename}' to '{out_filename}'")
-                self.root.after(0, self.update_ui_progress, file_idx, total_files, num_blocks, num_blocks, filename, "DONE")
                 
             except Exception as e:
-                fail_count += 1
+                with completed_lock:
+                    fail_count += 1
+                    self.progress_batch["value"] += 1
                 err_msg = str(e)
                 self.log_term(f"ERROR on {filename}: {err_msg}", is_error=True)
                 if os.path.exists(out_path):
                     os.remove(out_path)
-                    
-            if self.cancel_flag and os.path.exists(out_path):
-                os.remove(out_path)
-                
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(compress_single_file, item) for item in target_data]
+            for future in as_completed(futures):
+                if self.cancel_flag: break
+
         self.root.after(0, lambda: self._finalize_compression_ui(success_count, skip_count, fail_count))
             
     def _finalize_compression_ui(self, success_count=0, skip_count=0, fail_count=0):
