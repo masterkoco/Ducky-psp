@@ -138,10 +138,6 @@ class DuckShrinkApp:
                                      activebackground=self.yellow, activeforeground="black", command=self.refresh_folder, relief=tk.SOLID, bd=1, padx=3, pady=3)
         self.btn_refresh.pack(side=tk.LEFT, padx=2)
 
-        self.btn_test_meta = tk.Button(self.frame_browse, text="[ LOCAL NAMING ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow, 
-                                       activebackground=self.yellow, activeforeground="black", command=self.test_metadata, relief=tk.SOLID, bd=1, padx=3, pady=3)
-        self.btn_test_meta.pack(side=tk.LEFT, padx=2)
-
         self.btn_undo = tk.Button(self.frame_browse, text="[ UNDO ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.pink, 
                                   activebackground=self.pink, activeforeground="black", command=self.undo_rename, relief=tk.SOLID, bd=1, padx=3, pady=3)
         self.btn_undo.pack(side=tk.LEFT, padx=2)
@@ -149,6 +145,10 @@ class DuckShrinkApp:
         self.btn_open_logs = tk.Button(self.frame_browse, text="[ LOGS ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.cyan, 
                                        activebackground=self.cyan, activeforeground="black", command=self.open_logs_folder, relief=tk.SOLID, bd=1, padx=3, pady=3)
         self.btn_open_logs.pack(side=tk.LEFT, padx=2)
+
+        self.btn_test_sound = tk.Button(self.frame_browse, text="[ 🔊 QUACK ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow, 
+                                        activebackground=self.yellow, activeforeground="black", command=self._play_quack, relief=tk.SOLID, bd=1, padx=3, pady=3)
+        self.btn_test_sound.pack(side=tk.LEFT, padx=2)
         
         self.lbl_file = tk.Label(root, text="STATUS: AWAITING INPUT", bg=self.bg_color, fg="#555555", font=("Monospace", 9, "bold"))
         self.lbl_file.pack(pady=3)
@@ -165,7 +165,7 @@ class DuckShrinkApp:
                                         activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=6, pady=2)
         self.btn_change_out.pack(side=tk.RIGHT)
 
-        # Smart Renaming Frame (Local PARAM.SFO)
+        # Smart Renaming Frame (Local PARAM.SFO) - Features [ START LOCAL ] button
         self.frame_rename = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.yellow, highlightthickness=1, padx=8, pady=4)
         self.frame_rename.pack(pady=3, fill="x", padx=30)
         
@@ -189,16 +189,20 @@ class DuckShrinkApp:
             "Title_GameID", 
             "GameID - Title"
         ]
-        self.pattern_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.pattern_var, values=pattern_options, state="readonly", width=17)
-        self.pattern_dropdown.pack(side=tk.LEFT, padx=3)
+        self.pattern_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.pattern_var, values=pattern_options, state="readonly", width=15)
+        self.pattern_dropdown.pack(side=tk.LEFT, padx=2)
         self.pattern_dropdown.bind("<<ComboboxSelected>>", lambda e: self.save_config())
         
         self.lbl_case = tk.Label(ren_sub_frame, text="Case:", bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8))
-        self.lbl_case.pack(side=tk.LEFT, padx=4)
+        self.lbl_case.pack(side=tk.LEFT, padx=2)
         self.case_var = tk.StringVar(value=self.saved_settings.get("case", "Normal"))
-        self.case_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.case_var, values=["Normal", "ALL CAPS", "all lowercase", "Title Case", "snake_case"], state="readonly", width=12)
-        self.case_dropdown.pack(side=tk.LEFT, padx=3)
+        self.case_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.case_var, values=["Normal", "ALL CAPS", "all lowercase", "Title Case", "snake_case"], state="readonly", width=10)
+        self.case_dropdown.pack(side=tk.LEFT, padx=2)
         self.case_dropdown.bind("<<ComboboxSelected>>", lambda e: self.save_config())
+
+        self.btn_test_meta = tk.Button(ren_sub_frame, text="[ START LOCAL ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.yellow, 
+                                       activebackground=self.yellow, activeforeground="black", command=self.test_metadata, relief=tk.SOLID, bd=1, padx=4, pady=2)
+        self.btn_test_meta.pack(side=tk.RIGHT, padx=2)
 
         chk_sub_frame = tk.Frame(self.frame_rename, bg=self.panel_bg)
         chk_sub_frame.pack(fill="x", pady=2)
@@ -481,9 +485,9 @@ class DuckShrinkApp:
                 self.btn_browse_file.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
                 self.btn_browse_folder.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
                 self.btn_refresh.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
-                self.btn_test_meta.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
                 self.btn_undo.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
                 self.btn_open_logs.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
+                self.btn_test_sound.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
                 
                 self.frame_output.configure(bg=self.panel_bg, highlightbackground=self.pink)
                 self.lbl_out_title.configure(bg=self.panel_bg, fg=self.text_color)
@@ -493,6 +497,7 @@ class DuckShrinkApp:
                 self.lbl_rename_title.configure(bg=self.panel_bg, fg=self.yellow)
                 self.lbl_pattern.configure(bg=self.panel_bg, fg=self.text_color)
                 self.lbl_case.configure(bg=self.panel_bg, fg=self.text_color)
+                self.btn_test_meta.configure(bg=self.bg_color, fg=self.yellow, activebackground=self.yellow)
                 self.chk_skip_formatted.configure(bg=self.panel_bg, fg=self.yellow, selectcolor=self.bg_color)
                 self.chk_force_rename.configure(bg=self.panel_bg, fg=self.pink, selectcolor=self.bg_color)
 
@@ -542,8 +547,11 @@ class DuckShrinkApp:
         if os.path.exists(self.sound_file):
             try:
                 subprocess.Popen(["paplay", self.sound_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
+                self.log_term("Test quack sound triggered successfully.")
+            except Exception as e:
+                self.log_term(f"Failed to play quack sound: {str(e)}", is_error=True)
+        else:
+            self.log_term("Quack sound file not found.", is_error=True)
 
     def change_output_dir(self):
         dir_path = filedialog.askdirectory(initialdir=self.last_dir, title="SELECT CUSTOM OUTPUT DIRECTORY")
