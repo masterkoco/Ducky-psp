@@ -36,8 +36,8 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor v10.0")
-        self.root.geometry("660x1160")
+        self.root.title("DuckShrink_PSP // Batch Compressor v10.1")
+        self.root.geometry("660x1180")
         
         os.makedirs(LOG_DIR, exist_ok=True)
         
@@ -114,7 +114,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.0]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.1]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         # Right Header Action Buttons (Themes & Golden Donate Button)
@@ -171,23 +171,27 @@ class DuckShrinkApp:
         self.lbl_file = tk.Label(root, text="STATUS: AWAITING INPUT", bg=self.bg_color, fg="#555555", font=("Monospace", 9, "bold"))
         self.lbl_file.pack(pady=3)
         
-        # Output Path Configuration Frame
-        self.frame_output = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.pink, highlightthickness=1, padx=8, pady=4)
+        # Output Path Configuration Frame (Highlighted with Pink border)
+        self.frame_output = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.pink, highlightthickness=2, padx=8, pady=4)
         self.frame_output.pack(pady=3, fill="x", padx=30)
         
-        out_display_text = f"OUTPUT: {self.custom_output_dir[:30]}..." if self.custom_output_dir else "OUTPUT: /.../compressed (Auto)"
+        out_display_text = f"OUTPUT: {self.custom_output_dir[:24]}..." if self.custom_output_dir else "OUTPUT: /.../compressed (Auto)"
         self.lbl_out_title = tk.Label(self.frame_output, text=out_display_text, bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8, "bold"), anchor="w")
         self.lbl_out_title.pack(side=tk.LEFT, fill="x", expand=True)
+
+        self.btn_open_out = tk.Button(self.frame_output, text="[ OUTPUT FOLDER ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.cyan,
+                                      activebackground=self.cyan, activeforeground="black", command=self.open_output_dir, relief=tk.SOLID, bd=1, padx=5, pady=2)
+        self.btn_open_out.pack(side=tk.RIGHT, padx=2)
         
         self.btn_change_out = tk.Button(self.frame_output, text="[ CHANGE ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.pink,
-                                        activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=6, pady=2)
-        self.btn_change_out.pack(side=tk.RIGHT)
+                                        activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=5, pady=2)
+        self.btn_change_out.pack(side=tk.RIGHT, padx=2)
 
-        # Smart Renaming Frame (Local PARAM.SFO)
-        self.frame_rename = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.yellow, highlightthickness=1, padx=8, pady=4)
+        # Smart Renaming Frame (Local PARAM.SFO) - Highlighted with Yellow border
+        self.frame_rename = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.yellow, highlightthickness=2, padx=8, pady=4)
         self.frame_rename.pack(pady=3, fill="x", padx=30)
         
-        self.lbl_rename_title = tk.Label(self.frame_rename, text="LOCAL RENAME CONFIGURATION (PARAM.SFO):", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
+        self.lbl_rename_title = tk.Label(self.frame_rename, text="⭐ LOCAL RENAME CONFIGURATION (PARAM.SFO):", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
         self.lbl_rename_title.pack(anchor="w", padx=2)
         
         ren_sub_frame = tk.Frame(self.frame_rename, bg=self.panel_bg)
@@ -207,14 +211,14 @@ class DuckShrinkApp:
             "Title_GameID", 
             "GameID - Title"
         ]
-        self.pattern_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.pattern_var, values=pattern_options, state="readonly", width=15)
+        self.pattern_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.pattern_var, values=pattern_options, state="readonly", width=14)
         self.pattern_dropdown.pack(side=tk.LEFT, padx=2)
         self.pattern_dropdown.bind("<<ComboboxSelected>>", lambda e: self.save_config())
         
         self.lbl_case = tk.Label(ren_sub_frame, text="Case:", bg=self.panel_bg, fg=self.text_color, font=("Monospace", 8))
         self.lbl_case.pack(side=tk.LEFT, padx=2)
         self.case_var = tk.StringVar(value=self.saved_settings.get("case", "Normal"))
-        self.case_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.case_var, values=["Normal", "ALL CAPS", "all lowercase", "Title Case", "snake_case"], state="readonly", width=10)
+        self.case_dropdown = ttk.Combobox(ren_sub_frame, textvariable=self.case_var, values=["Normal", "ALL CAPS", "all lowercase", "Title Case", "snake_case"], state="readonly", width=9)
         self.case_dropdown.pack(side=tk.LEFT, padx=2)
         self.case_dropdown.bind("<<ComboboxSelected>>", lambda e: self.save_config())
 
@@ -233,11 +237,11 @@ class DuckShrinkApp:
         self.chk_force_rename = tk.Checkbutton(chk_sub_frame, text="Force Rename", variable=self.force_rename_var, bg=self.panel_bg, fg=self.pink, selectcolor=self.bg_color, font=("Monospace", 8, "bold"))
         self.chk_force_rename.pack(side=tk.LEFT, padx=10)
 
-        # Dedicated Online Scraping Frame
-        self.frame_online = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=1, padx=8, pady=4)
+        # Dedicated Online Scraping Frame - Highlighted with Cyan border
+        self.frame_online = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=2, padx=8, pady=4)
         self.frame_online.pack(pady=3, fill="x", padx=30)
         
-        self.lbl_online_title = tk.Label(self.frame_online, text="ONLINE SCRAPING HUB (GAMETDB / PKGj):", bg=self.panel_bg, fg=self.cyan, font=("Monospace", 9, "bold"))
+        self.lbl_online_title = tk.Label(self.frame_online, text="⭐ ONLINE SCRAPING HUB (GAMETDB / PKGj):", bg=self.panel_bg, fg=self.cyan, font=("Monospace", 9, "bold"))
         self.lbl_online_title.pack(anchor="w", padx=2)
         
         online_btn_frame = tk.Frame(self.frame_online, bg=self.panel_bg)
@@ -251,14 +255,14 @@ class DuckShrinkApp:
                                            activebackground=self.yellow, activeforeground="black", command=self.start_online_rename, relief=tk.SOLID, bd=1, padx=6, pady=3)
         self.btn_online_rename.pack(side=tk.LEFT, padx=3)
 
-        # Format Selection & Multi-Threading Config Frame
-        self.frame_format = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=1, padx=8, pady=4)
+        # Format Selection & Multi-Threading Config Frame - Highlighted with Cyan border
+        self.frame_format = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=2, padx=8, pady=4)
         self.frame_format.pack(pady=4, fill="x", padx=30)
         
         fmt_top_frame = tk.Frame(self.frame_format, bg=self.panel_bg)
         fmt_top_frame.pack(fill="x", pady=2)
 
-        self.lbl_fmt_title = tk.Label(fmt_top_frame, text="OUTPUT_FORMAT:", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
+        self.lbl_fmt_title = tk.Label(fmt_top_frame, text="⭐ OUTPUT_FORMAT:", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
         self.lbl_fmt_title.pack(side=tk.LEFT, padx=6)
         
         self.format_var = tk.StringVar(value=self.saved_settings.get("format", "ZSO"))
@@ -354,7 +358,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v10.0 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v10.1 Initialized successfully.")
 
     def load_config(self):
         self.saved_settings = {}
@@ -468,6 +472,22 @@ class DuckShrinkApp:
         except Exception as e:
             messagebox.showerror("SYS_ERROR", f"Could not open logs folder:\n{str(e)}")
 
+    def open_output_dir(self):
+        """Opens the target output directory (either custom or the default 'compressed' folder of the active file)."""
+        target_dir = self.custom_output_dir
+        if not target_dir and self.file_paths:
+            target_dir = os.path.join(os.path.dirname(self.file_paths[0]), "compressed")
+        
+        if target_dir and os.path.exists(target_dir):
+            try:
+                abs_path = os.path.abspath(target_dir)
+                subprocess.Popen(["xdg-open", abs_path])
+                self.log_term(f"Opened output directory: {abs_path}")
+            except Exception as e:
+                messagebox.showerror("SYS_ERROR", f"Could not open output folder:\n{str(e)}")
+        else:
+            messagebox.showwarning("NOTICE", "No active output folder exists yet. Select files or set an output directory first.")
+
     def open_donation_link(self):
         try:
             webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=LUT2LHRKQ27LN")
@@ -555,6 +575,7 @@ class DuckShrinkApp:
                 
                 self.frame_output.configure(bg=self.panel_bg, highlightbackground=self.pink)
                 self.lbl_out_title.configure(bg=self.panel_bg, fg=self.text_color)
+                self.btn_open_out.configure(bg=self.bg_color, fg=self.cyan, activebackground=self.cyan)
                 self.btn_change_out.configure(bg=self.bg_color, fg=self.pink, activebackground=self.pink)
                 
                 self.frame_rename.configure(bg=self.panel_bg, highlightbackground=self.yellow)
@@ -692,7 +713,7 @@ class DuckShrinkApp:
         if dir_path:
             self.custom_output_dir = dir_path
             self.last_dir = dir_path
-            short_path = (dir_path[:30] + '...') if len(dir_path) > 30 else dir_path
+            short_path = (dir_path[:24] + '...') if len(dir_path) > 24 else dir_path
             self.lbl_out_title.config(text=f"OUTPUT: {short_path} (Custom)")
             self.log_term(f"Output directory set to: {dir_path}")
             self.save_config()
@@ -1054,7 +1075,6 @@ class DuckShrinkApp:
                 single_est = (f_size * ratio) + overhead
                 total_est_size += single_est
                 
-                # Log individual file estimate to terminal console log
                 single_mb = single_est / (1024 * 1024)
                 single_str = f"{single_mb / 1024:.2f} GB" if single_mb >= 1024 else f"{single_mb:.2f} MB"
                 self.log_term(f"Est: {os.path.basename(path)} -> {single_str}")
