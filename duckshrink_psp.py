@@ -35,8 +35,8 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor & PS1 Eboot v10.6")
-        self.root.geometry("660x1320")
+        self.root.title("DuckShrink_PSP // Batch Compressor & PS1 Eboot v10.8")
+        self.root.geometry("660x1380")
         
         os.makedirs(LOG_DIR, exist_ok=True)
         
@@ -118,7 +118,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.6]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.8]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         header_right_frame = tk.Frame(header_frame, bg=self.bg_color)
@@ -185,6 +185,14 @@ class DuckShrinkApp:
                                         activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=5, pady=2)
         self.btn_change_out.pack(side=tk.RIGHT, padx=2)
 
+        # Dynamic Mode Panels & Container
+        self.dynamic_container = tk.Frame(root, bg=self.bg_color)
+        self.dynamic_container.pack(fill="x", padx=30, pady=2)
+
+        self.build_psp_mode_panel()
+        self.build_ps1_mode_panel()
+        self.update_mode_visibility() 
+        
         # Format Selection & Multi-Threading Config Frame
         self.frame_format = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=2, padx=8, pady=4)
         self.frame_format.pack(pady=4, fill="x", padx=30)
@@ -234,7 +242,7 @@ class DuckShrinkApp:
         self.lbl_estimate = tk.Label(root, text="ESTIMATED YIELD: -- ?", font=("Monospace", 10, "bold"), bg=self.bg_color, fg=self.yellow)
         self.lbl_estimate.pack(pady=3)
         
-        # Action Buttons (Defined BEFORE update_mode_visibility)
+        # Action Buttons
         self.frame_actions = tk.Frame(root, bg=self.bg_color)
         self.frame_actions.pack(pady=4)
         
@@ -249,14 +257,6 @@ class DuckShrinkApp:
         self.btn_cancel = tk.Button(self.frame_actions, text="[ ABORT ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.pink, 
                                     activebackground=self.pink, activeforeground="black", command=self.cancel_action, relief=tk.SOLID, bd=1, padx=8, pady=5, state=tk.DISABLED)
         self.btn_cancel.pack(side=tk.LEFT, padx=4)
-
-        # Dynamic Mode Panels & Container
-        self.dynamic_container = tk.Frame(root, bg=self.bg_color)
-        self.dynamic_container.pack(fill="x", padx=30, pady=2)
-
-        self.build_psp_mode_panel()
-        self.build_ps1_mode_panel()
-        self.update_mode_visibility() # Safe to call now since btn_compress exists
         
         # Progress Tracking
         self.lbl_status = tk.Label(root, text="SYSTEM IDLE", bg=self.bg_color, fg=self.text_color, font=("Monospace", 9, "bold"))
@@ -294,7 +294,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v10.6 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v10.8 Initialized successfully.")
 
     def build_psp_mode_panel(self):
         self.panel_psp = tk.Frame(self.dynamic_container, bg=self.bg_color)
@@ -368,6 +368,9 @@ class DuckShrinkApp:
         self.btn_ps1_select = tk.Button(ps1_btn_row, text="[ SELECT PS1 CUE/BIN ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.cyan, command=self.browse_ps1_files, relief=tk.SOLID, bd=1, padx=6, pady=3)
         self.btn_ps1_select.pack(side=tk.LEFT, padx=2)
 
+        self.btn_fetch_art = tk.Button(ps1_btn_row, text="[ 🌐 AUTO-FETCH ONLINE ART ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.yellow, command=self.fetch_online_artwork_for_ps1, relief=tk.SOLID, bd=1, padx=6, pady=3)
+        self.btn_fetch_art.pack(side=tk.LEFT, padx=2)
+
         art_box = tk.LabelFrame(self.frame_ps1_hub, text=" Custom Artwork Manager (PS1 Only) ", bg=self.panel_bg, fg=self.cyan, font=("Monospace", 8, "bold"), padx=5, pady=5)
         art_box.pack(fill="x", pady=4)
 
@@ -377,13 +380,14 @@ class DuckShrinkApp:
         tk.Button(art_btn_row, text="[ ICON0 ]", font=("Monospace", 7, "bold"), bg=self.bg_color, fg=self.yellow, command=lambda: self.browse_ps1_art('icon0'), relief=tk.SOLID, bd=1).pack(side=tk.LEFT, padx=2)
         tk.Button(art_btn_row, text="[ PIC0 ]", font=("Monospace", 7, "bold"), bg=self.bg_color, fg=self.yellow, command=lambda: self.browse_ps1_art('pic0'), relief=tk.SOLID, bd=1).pack(side=tk.LEFT, padx=2)
         tk.Button(art_btn_row, text="[ PIC1 ]", font=("Monospace", 7, "bold"), bg=self.bg_color, fg=self.yellow, command=lambda: self.browse_ps1_art('pic1'), relief=tk.SOLID, bd=1).pack(side=tk.LEFT, padx=2)
-        tk.Button(art_btn_row, text="[ CLEAR ART ]", font=("Monospace", 7, "bold"), bg=self.bg_color, fg=self.pink, command=self.clear_ps1_art, relief=tk.SOLID, bd=1).pack(side=tk.LEFT, padx=2)
+        tk.Button(art_btn_row, text="[ 🔍 SCAN FOLDER FOR ART ]", font=("Monospace", 7, "bold"), bg=self.bg_color, fg=self.cyan, command=self.scan_folder_for_artwork, relief=tk.SOLID, bd=1).pack(side=tk.LEFT, padx=2)
+        tk.Button(art_btn_row, text="[ CLEAR ]", font=("Monospace", 7, "bold"), bg=self.bg_color, fg=self.pink, command=self.clear_ps1_art, relief=tk.SOLID, bd=1).pack(side=tk.LEFT, padx=2)
 
-        self.lbl_art_summary = tk.Label(art_box, text="Icon: Default | Banner: Default | Wallpaper: Default", bg=self.panel_bg, fg="#AAAAAA", font=("Monospace", 7))
+        self.lbl_art_summary = tk.Label(art_box, text="Icon: Auto-Scanned | Banner: Auto-Scanned | Wallpaper: Auto-Scanned", bg=self.panel_bg, fg="#AAAAAA", font=("Monospace", 7))
         self.lbl_art_summary.pack(anchor="w", pady=(3, 0))
 
     def browse_ps1_art(self, art_type):
-        path = filedialog.askopenfilename(initialdir=self.last_dir, title=f"Select {art_type.upper()} Image", filetypes=[("PNG Images", "*.png"), ("All Files", "*.*")])
+        path = filedialog.askopenfilename(initialdir=self.last_dir, title=f"Select {art_type.upper()} Image", filetypes=[("Image Files", "*.png *.jpg *.jpeg"), ("All Files", "*.*")])
         if path:
             if art_type == 'icon0':
                 self.ps1_icon0 = path
@@ -394,6 +398,31 @@ class DuckShrinkApp:
             self.update_ps1_art_summary()
             self.log_term(f"Set PS1 {art_type.upper()} artwork: {os.path.basename(path)}")
 
+    def scan_folder_for_artwork(self):
+        if not self.ps1_discs:
+            messagebox.showwarning("NOTICE", "Please select a PS1 disc image first so the app knows which directory to scan.")
+            return
+        
+        dirname = os.path.dirname(self.ps1_discs[0])
+        base_name = os.path.splitext(os.path.basename(self.ps1_discs[0]))[0]
+        
+        found_count = 0
+        for ext in ('.png', '.jpg', '.jpeg'):
+            # Check for exact game name match or generic cover names
+            for candidate_prefix in (base_name, "cover", "front", "icon0", "art"):
+                path = os.path.join(dirname, f"{candidate_prefix}{ext}")
+                if os.path.exists(path):
+                    if not self.ps1_icon0 and ("icon" in candidate_prefix or "front" in candidate_prefix or "cover" in candidate_prefix):
+                        self.ps1_icon0 = path
+                        found_count += 1
+                    elif not self.ps1_pic1 and ("wallpaper" in candidate_prefix or "bg" in candidate_prefix or "art" in candidate_prefix or candidate_prefix == base_name):
+                        self.ps1_pic1 = path
+                        found_count += 1
+
+        self.update_ps1_art_summary()
+        self.log_term(f"Scanned folder '{dirname}': Auto-matched {found_count} artwork file(s).")
+        messagebox.showinfo("Artwork Scan", f"Scan complete! Found and attached {found_count} matching artwork image(s).")
+
     def clear_ps1_art(self):
         self.ps1_icon0 = ""
         self.ps1_pic0 = ""
@@ -402,10 +431,33 @@ class DuckShrinkApp:
         self.log_term("Cleared custom PS1 artwork choices.")
 
     def update_ps1_art_summary(self):
-        ic = os.path.basename(self.ps1_icon0) if self.ps1_icon0 else "Default"
-        p0 = os.path.basename(self.ps1_pic0) if self.ps1_pic0 else "Default"
-        p1 = os.path.basename(self.ps1_pic1) if self.ps1_pic1 else "Default"
+        ic = os.path.basename(self.ps1_icon0) if self.ps1_icon0 else "Auto-Scanned"
+        p0 = os.path.basename(self.ps1_pic0) if self.ps1_pic0 else "Auto-Scanned"
+        p1 = os.path.basename(self.ps1_pic1) if self.ps1_pic1 else "Auto-Scanned"
         self.lbl_art_summary.config(text=f"Icon0: {ic} | Pic0: {p0} | Pic1: {p1}")
+
+    def fetch_online_artwork_for_ps1(self):
+        if not self.ps1_discs:
+            messagebox.showwarning("NOTICE", "Please select a PS1 disc image first to determine its Game ID.")
+            return
+        
+        self.log_term("Querying online covers database for PS1 artwork...")
+        try:
+            filename = os.path.basename(self.ps1_discs[0])
+            id_match = re.search(r'\b[A-Z]{4}-\d{5}\b|\b[A-Z]{4}\d{5}\b', filename)
+            game_id = id_match.group(0).replace("-", "") if id_match else "SLUS00000"
+            
+            covers_dir = os.path.join(APP_DIR, "cache_covers")
+            os.makedirs(covers_dir, exist_ok=True)
+            
+            icon_cache = os.path.join(covers_dir, f"{game_id}_icon0.png")
+            urllib.request.urlretrieve(f"https://raw.githubusercontent.com/xperia64/pkgj/master/icons/{game_id}.png", icon_cache)
+            self.ps1_icon0 = icon_cache
+            self.update_ps1_art_summary()
+            messagebox.showinfo("Online Art", f"Successfully fetched online artwork for ID: {game_id}")
+        except Exception as e:
+            self.log_term(f"Could not auto-fetch online artwork: {str(e)}", is_error=True)
+            messagebox.showwarning("Online Art", "Could not fetch online art directly. Using local file artwork or defaults.")
 
     def toggle_app_mode(self):
         if self.app_mode == "PSP":
@@ -753,15 +805,33 @@ class DuckShrinkApp:
         success, failed = 0, 0
         total_files = len(self.ps1_discs)
         
-        icon0_data = open(self.ps1_icon0, 'rb').read() if self.ps1_icon0 and os.path.exists(self.ps1_icon0) else b''
-        pic0_data = open(self.ps1_pic0, 'rb').read() if self.ps1_pic0 and os.path.exists(self.ps1_pic0) else b''
-        pic1_data = open(self.ps1_pic1, 'rb').read() if self.ps1_pic1 and os.path.exists(self.ps1_pic1) else b''
         sfo_data = b'PSF\x01\x01\x00\x00'
 
         for idx, path in enumerate(self.ps1_discs):
             if self.cancel_flag: break
             filename = os.path.basename(path)
+            dirname = os.path.dirname(path)
+            base_name = os.path.splitext(filename)[0]
             
+            # --- Auto-Scan directory for matching artwork if not manually set ---
+            active_icon0 = self.ps1_icon0
+            active_pic1 = self.ps1_pic1
+            
+            if not active_icon0:
+                for candidate in (os.path.join(dirname, f"{base_name}.png"), os.path.join(dirname, f"{base_name}_icon0.png"), os.path.join(dirname, "cover.png")):
+                    if os.path.exists(candidate):
+                        active_icon0 = candidate
+                        break
+            if not active_pic1:
+                for candidate in (os.path.join(dirname, f"{base_name}_pic1.png"), os.path.join(dirname, "wallpaper.png"), os.path.join(dirname, "bg.png")):
+                    if os.path.exists(candidate):
+                        active_pic1 = candidate
+                        break
+
+            icon0_data = open(active_icon0, 'rb').read() if active_icon0 and os.path.exists(active_icon0) else b''
+            pic0_data = b''
+            pic1_data = open(active_pic1, 'rb').read() if active_pic1 and os.path.exists(active_pic1) else b''
+
             counter_str = f"[{idx + 1}/{total_files}]"
             self.log_term(f"Converting PS1 Disc {counter_str}: {filename} -> EBOOT.PBP")
             self.lbl_status.config(text=f"CONVERTING PS1 {counter_str}: {filename}", fg=self.cyan)
@@ -769,8 +839,6 @@ class DuckShrinkApp:
             self.progress_batch["value"] = idx
             
             try:
-                dirname = os.path.dirname(path)
-                base_name = os.path.splitext(filename)[0]
                 out_dir = self.custom_output_dir if self.custom_output_dir else os.path.join(dirname, "compressed")
                 os.makedirs(out_dir, exist_ok=True)
                 
@@ -781,7 +849,7 @@ class DuckShrinkApp:
                 off_icon0 = off_sfo + len(sfo_data)
                 off_icon1 = off_icon0 + len(icon0_data)
                 off_pic0 = off_icon1
-                off_pic1 = off_pic0 + len(pic0_data)
+                off_pic1 = off_pic0
                 off_snd0 = off_pic1 + len(pic1_data)
                 off_data_psp = off_snd0
                 off_data_psar = off_data_psp
@@ -792,7 +860,6 @@ class DuckShrinkApp:
                     
                     f_out.write(sfo_data)
                     if icon0_data: f_out.write(icon0_data)
-                    if pic0_data: f_out.write(pic0_data)
                     if pic1_data: f_out.write(pic1_data)
                     
                     with open(path, 'rb') as f_in:
