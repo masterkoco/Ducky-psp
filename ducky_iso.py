@@ -23,8 +23,8 @@ except ImportError:
 class ISOCompressorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckyISO // PSP Batch Compressor v5.0")
-        self.root.geometry("620x840")
+        self.root.title("DuckyISO // PSP Batch Compressor v5.2")
+        self.root.geometry("620x860")
         
         # Color Palettes (Cyberpunk Themes)
         self.themes = {
@@ -62,7 +62,7 @@ class ISOCompressorApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(12, 4), fill="x", padx=20)
         
-        tk.Label(header_frame, text="DUCKY_ISO [v5.0]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan).pack(side=tk.LEFT)
+        tk.Label(header_frame, text="DUCKY_ISO [v5.2]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan).pack(side=tk.LEFT)
         
         # Theme Switcher Button
         self.btn_theme = tk.Button(header_frame, text="THEME: CYBERPUNK", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow,
@@ -77,11 +77,16 @@ class ISOCompressorApp:
         
         self.btn_browse_file = tk.Button(frame_browse, text="[ SELECT FILE(S) ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.cyan, 
                                     activebackground=self.cyan, activeforeground="black", command=self.browse_files, relief=tk.SOLID, bd=1, padx=8, pady=4)
-        self.btn_browse_file.pack(side=tk.LEFT, padx=8)
+        self.btn_browse_file.pack(side=tk.LEFT, padx=6)
 
         self.btn_browse_folder = tk.Button(frame_browse, text="[ SELECT FOLDER ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.pink, 
                                     activebackground=self.pink, activeforeground="black", command=self.browse_folder, relief=tk.SOLID, bd=1, padx=8, pady=4)
-        self.btn_browse_folder.pack(side=tk.LEFT, padx=8)
+        self.btn_browse_folder.pack(side=tk.LEFT, padx=6)
+
+        # Diagnostic Test Button
+        self.btn_test_meta = tk.Button(frame_browse, text="[ TEST METADATA ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.yellow, 
+                                       activebackground=self.yellow, activeforeground="black", command=self.test_metadata, relief=tk.SOLID, bd=1, padx=8, pady=4)
+        self.btn_test_meta.pack(side=tk.LEFT, padx=6)
         
         self.lbl_file = tk.Label(root, text="STATUS: AWAITING INPUT", bg=self.bg_color, fg="#555555", font=("Monospace", 9, "bold"))
         self.lbl_file.pack(pady=4)
@@ -234,6 +239,7 @@ class ISOCompressorApp:
         self.rb_cso.configure(bg=self.panel_bg, fg=self.text_color, activebackground=self.panel_bg, activeforeground=self.cyan)
         self.btn_browse_file.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
         self.btn_browse_folder.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
+        self.btn_test_meta.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
         self.btn_theme.configure(bg=self.panel_bg, fg=self.yellow, activebackground=self.yellow)
         self.btn_convert.configure(bg=self.panel_bg, fg=self.cyan, activebackground=self.cyan)
         self.btn_cancel.configure(bg=self.panel_bg, fg=self.pink, activebackground=self.pink)
@@ -298,6 +304,24 @@ class ISOCompressorApp:
             if found_files:
                 self.file_paths = found_files
                 self._update_file_status()
+
+    def test_metadata(self):
+        """Diagnostic tool to verify PARAM.SFO extraction on selected files."""
+        if not self.file_paths:
+            messagebox.showwarning("NOTICE", "Please select at least one file first to test metadata.")
+            return
+        
+        test_file = self.file_paths[0]
+        title, game_id = PSPImageReader.get_game_metadata(test_file)
+        
+        msg = f"File: {os.path.basename(test_file)}\n\n"
+        if title:
+            msg += f"Detected Title: {title}\n"
+            msg += f"Detected Game ID: {game_id}"
+        else:
+            msg += "RESULT: Could not locate PARAM.SFO header. The file might use a non-standard layout."
+            
+        messagebox.showinfo("Metadata Diagnostic", msg)
 
     def _update_file_status(self):
         total_size_mb = sum(os.path.getsize(p) for p in self.file_paths) / (1024 * 1024)
@@ -371,7 +395,6 @@ class ISOCompressorApp:
         pattern = self.pattern_var.get()
         case_style = self.case_var.get()
 
-        # Apply Case Style
         if case_style == "ALL CAPS":
             clean_title = clean_title.upper()
             if game_id: game_id = game_id.upper()
@@ -383,7 +406,6 @@ class ISOCompressorApp:
         elif case_style == "snake_case":
             clean_title = clean_title.lower().replace(" ", "_")
 
-        # Apply Pattern Template
         if pattern == "Title [GameID]" and game_id:
             base = f"{clean_title} [{game_id}]"
         elif pattern == "[GameID] Title" and game_id:
@@ -422,6 +444,7 @@ class ISOCompressorApp:
         total_files = len(self.file_paths)
         self.progress_batch["maximum"] = total_files
         renamed_count = 0
+        skipped_count = 0
 
         for idx, path in enumerate(self.file_paths):
             if self.cancel_flag: break
@@ -431,6 +454,7 @@ class ISOCompressorApp:
                 
                 game_title, game_id = PSPImageReader.get_game_metadata(path)
                 if not game_title:
+                    skipped_count += 1
                     continue
                 
                 new_name = self.format_filename(game_title, game_id, ext)
@@ -448,11 +472,11 @@ class ISOCompressorApp:
                 self.progress_batch["value"] = idx + 1
                 self.lbl_status.config(text=f"RENAMED: {new_name}", fg=self.yellow)
             except Exception:
-                pass
+                skipped_count += 1
 
-        self.root.after(0, lambda: self._finalize_rename_ui(renamed_count))
+        self.root.after(0, lambda: self._finalize_rename_ui(renamed_count, skipped_count))
 
-    def _finalize_rename_ui(self, count):
+    def _finalize_rename_ui(self, count, skipped):
         self.is_converting = False
         self.btn_convert.config(state=tk.NORMAL)
         self.slider.config(state=tk.NORMAL)
@@ -460,9 +484,9 @@ class ISOCompressorApp:
         self.btn_browse_folder.config(state=tk.NORMAL)
         self.btn_change_out.config(state=tk.NORMAL)
         self.btn_cancel.config(state=tk.DISABLED)
-        self.lbl_status.config(text=f"RENAME COMPLETE: {count} FILE(S) UPDATED", fg=self.cyan)
+        self.lbl_status.config(text=f"RENAME COMPLETE: {count} UPDATED, {skipped} SKIPPED", fg=self.cyan)
         self._play_quack()
-        messagebox.showinfo("SUCCESS", f"Successfully renamed {count} game file(s).")
+        messagebox.showinfo("SUCCESS", f"Successfully renamed {count} game file(s).\nSkipped: {skipped} (metadata not found)")
         self.file_paths = []
         self.lbl_file.config(text="STATUS: AWAITING INPUT", fg="#555555")
 
@@ -638,7 +662,7 @@ class ISOCompressorApp:
 
 
 class PSPImageReader:
-    """Universal parser that reads raw ISOs and compressed CSO/ZSO/DAX images, plus internal PARAM.SFO metadata."""
+    """Extension-aware parser that correctly decodes raw ISOs and compressed CSO/ZSO/DAX formats to find PARAM.SFO."""
     def __init__(self, filepath):
         self.filepath = filepath
         self.f = open(filepath, 'rb')
@@ -646,20 +670,38 @@ class PSPImageReader:
         self.file_size = self.f.tell()
         self.f.seek(0)
         
+        # Check extension and magic bytes
+        ext = os.path.splitext(filepath)[1].lower()
         magic = self.f.read(4)
-        if magic in (b'CISO', b'ZISO'):
+        
+        if magic in (b'CISO', b'ZISO') or ext in ('.cso', '.zso', '.dax'):
             self.is_compressed = True
-            header_size = struct.unpack('<I', self.f.read(4))[0]
-            self.total_size = struct.unpack('<Q', self.f.read(8))[0]
-            self.block_size = struct.unpack('<I', self.f.read(4))[0]
-            self.ver = struct.unpack('B', self.f.read(1))[0]
-            self.align = struct.unpack('B', self.f.read(1))[0]
-            self.f.read(2)
-            
+            if magic in (b'CISO', b'ZISO'):
+                header_size = struct.unpack('<I', self.f.read(4))[0]
+                self.total_size = struct.unpack('<Q', self.f.read(8))[0]
+                self.block_size = struct.unpack('<I', self.f.read(4))[0]
+                self.ver = struct.unpack('B', self.f.read(1))[0]
+                self.align = struct.unpack('B', self.f.read(1))[0]
+                self.f.read(2)
+            else:
+                # Fallback header parameters for standard compressed images if magic header offset varies
+                self.f.seek(0)
+                self.f.read(4) # skip magic
+                self.f.read(4) # header size
+                self.total_size = struct.unpack('<Q', self.f.read(8))[0]
+                self.block_size = struct.unpack('<I', self.f.read(4))[0]
+                self.ver = 1
+                self.align = 0
+                
             self.num_blocks = (self.total_size + self.block_size - 1) // self.block_size
             self.index_table = []
+            
+            # Read index table (block positions)
+            self.f.seek(24) # Standard CISO/ZISO header length
             for _ in range(self.num_blocks + 1):
-                self.index_table.append(struct.unpack('<I', self.f.read(4))[0])
+                data_bytes = self.f.read(4)
+                if len(data_bytes) < 4: break
+                self.index_table.append(struct.unpack('<I', data_bytes)[0])
         else:
             self.is_compressed = False
             self.total_size = self.file_size
@@ -667,44 +709,51 @@ class PSPImageReader:
             self.num_blocks = (self.total_size + self.block_size - 1) // self.block_size
 
     def read_block(self, idx):
-        if not self.is_compressed:
+        if not self.is_compressed or idx >= len(self.index_table) - 1:
             self.f.seek(idx * self.block_size)
             return self.f.read(self.block_size)
         else:
-            entry = self.index_table[idx]
-            next_entry = self.index_table[idx + 1]
-            is_raw = (entry & 0x80000000) != 0
-            start_pos = entry & 0x7FFFFFFF
-            end_pos = next_entry & 0x7FFFFFFF
-            
-            self.f.seek(start_pos)
-            compressed_data = self.f.read(end_pos - start_pos)
-            if is_raw or start_pos == end_pos:
-                return compressed_data
-            
-            self.f.seek(0)
-            fmt_magic = self.f.read(4)
-            if fmt_magic == b'CISO':
-                try:
-                    return zlib.decompress(compressed_data, wbits=-15)
-                except Exception:
+            try:
+                entry = self.index_table[idx]
+                next_entry = self.index_table[idx + 1]
+                is_raw = (entry & 0x80000000) != 0
+                start_pos = entry & 0x7FFFFFFF
+                end_pos = next_entry & 0x7FFFFFFF
+                
+                self.f.seek(start_pos)
+                compressed_data = self.f.read(end_pos - start_pos)
+                if is_raw or start_pos == end_pos or not compressed_data:
                     return compressed_data
-            elif fmt_magic == b'ZISO':
-                if zstd is not None:
+                
+                # Check compression type
+                self.f.seek(0)
+                fmt_magic = self.f.read(4)
+                
+                if fmt_magic == b'CISO' or self.filepath.lower().endswith('.cso'):
                     try:
-                        d = zstd.ZstdDecompressor()
-                        return d.decompress(compressed_data, max_output_size=self.block_size)
+                        return zlib.decompress(compressed_data, wbits=-15)
                     except Exception:
                         return compressed_data
-            return compressed_data
+                elif fmt_magic == b'ZISO' or self.filepath.lower().endswith('.zso'):
+                    if zstd is not None:
+                        try:
+                            d = zstd.ZstdDecompressor()
+                            return d.decompress(compressed_data, max_output_size=self.block_size)
+                        except Exception:
+                            return compressed_data
+                return compressed_data
+            except Exception:
+                self.f.seek(idx * self.block_size)
+                return self.f.read(self.block_size)
 
     @staticmethod
     def get_game_metadata(filepath):
-        """Scans ISO/CSO/ZSO sectors to find and parse the internal PARAM.SFO file for game title and ID."""
+        """Extension-aware metadata scanner that parses internal PARAM.SFO from ISO, CSO, or ZSO files."""
         try:
             reader = PSPImageReader(filepath)
             full_data = bytearray()
-            scan_limit = min(150, reader.num_blocks)
+            # Scan initial sectors where ISO9660 filesystem and PARAM.SFO reside
+            scan_limit = min(300, reader.num_blocks)
             for i in range(scan_limit):
                 full_data.extend(reader.read_block(i))
             reader.close()
@@ -739,7 +788,8 @@ class PSPImageReader:
                         elif key_name == 'DISC_ID':
                             game_id = val_data.decode('utf-8', errors='ignore').rstrip('\x00')
                             
-                    return title, game_id
+                    if title:
+                        return title, game_id
         except Exception:
             pass
         return "", ""
