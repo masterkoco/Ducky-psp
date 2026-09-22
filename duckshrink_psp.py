@@ -36,7 +36,7 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor v9.9")
+        self.root.title("DuckShrink_PSP // Batch Compressor v10.0")
         self.root.geometry("660x1160")
         
         os.makedirs(LOG_DIR, exist_ok=True)
@@ -114,7 +114,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.9]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.0]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         # Right Header Action Buttons (Themes & Golden Donate Button)
@@ -132,7 +132,7 @@ class DuckShrinkApp:
         self.lbl_drop_hint = tk.Label(root, text=">> DRAG & DROP FILES/FOLDERS OR USE SELECTORS", font=("Monospace", 8), bg=self.bg_color, fg=self.yellow)
         self.lbl_drop_hint.pack(pady=(0, 4))
         
-        # File/Folder Selection & Utility Buttons (Includes Queue Manager & Log Clearer)
+        # File/Folder Selection & Utility Buttons
         self.frame_browse = tk.Frame(root, bg=self.bg_color)
         self.frame_browse.pack(pady=3)
         
@@ -183,7 +183,7 @@ class DuckShrinkApp:
                                         activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=6, pady=2)
         self.btn_change_out.pack(side=tk.RIGHT)
 
-        # Smart Renaming Frame (Local PARAM.SFO) - Features [ START LOCAL ] button
+        # Smart Renaming Frame (Local PARAM.SFO)
         self.frame_rename = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.yellow, highlightthickness=1, padx=8, pady=4)
         self.frame_rename.pack(pady=3, fill="x", padx=30)
         
@@ -354,7 +354,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v9.9 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v10.0 Initialized successfully.")
 
     def load_config(self):
         self.saved_settings = {}
@@ -1051,7 +1051,13 @@ class DuckShrinkApp:
                 n_blocks = r_temp.num_blocks
                 r_temp.close()
                 overhead = 24 + (n_blocks + 1) * 4
-                total_est_size += (f_size * ratio) + overhead
+                single_est = (f_size * ratio) + overhead
+                total_est_size += single_est
+                
+                # Log individual file estimate to terminal console log
+                single_mb = single_est / (1024 * 1024)
+                single_str = f"{single_mb / 1024:.2f} GB" if single_mb >= 1024 else f"{single_mb:.2f} MB"
+                self.log_term(f"Est: {os.path.basename(path)} -> {single_str}")
 
             est_size_mb = total_est_size / (1024 * 1024)
             if est_size_mb >= 1024:
@@ -1324,7 +1330,6 @@ class DuckShrinkApp:
             filename = os.path.basename(in_path)
             out_filename = os.path.basename(out_path)
             
-            # Robust Smart Skip Check: Check history or if destination file already exists and is non-empty (> 1024 bytes)
             if out_path in self.completed_history or (os.path.exists(out_path) and os.path.getsize(out_path) > 1024):
                 with completed_lock:
                     skip_count += 1
