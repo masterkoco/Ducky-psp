@@ -138,7 +138,7 @@ class DuckShrinkApp:
                                      activebackground=self.yellow, activeforeground="black", command=self.refresh_folder, relief=tk.SOLID, bd=1, padx=3, pady=3)
         self.btn_refresh.pack(side=tk.LEFT, padx=2)
 
-        self.btn_test_meta = tk.Button(self.frame_browse, text="[ TEST META ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow, 
+        self.btn_test_meta = tk.Button(self.frame_browse, text="[ LOCAL NAMING ]", font=("Monospace", 8, "bold"), bg=self.panel_bg, fg=self.yellow, 
                                        activebackground=self.yellow, activeforeground="black", command=self.test_metadata, relief=tk.SOLID, bd=1, padx=3, pady=3)
         self.btn_test_meta.pack(side=tk.LEFT, padx=2)
 
@@ -630,72 +630,42 @@ class DuckShrinkApp:
 
     def process_loaded_files(self, file_list):
         self.file_paths = file_list
-        self.btn_compress.config(state=tk.DISABLED)
-        self.btn_rename.config(state=tk.DISABLED)
-        self.btn_browse_file.config(state=tk.DISABLED)
-        self.btn_browse_folder.config(state=tk.DISABLED)
-        
-        threading.Thread(target=self._run_file_scan_feedback, args=(file_list,), daemon=True).start()
-
-    def _run_file_scan_feedback(self, file_list):
         total = len(file_list)
-        total_size_bytes = 0
-        
-        for idx, path in enumerate(file_list):
-            total_size_bytes += os.path.getsize(path)
-            filename = os.path.basename(path)
-            status_text = f"[SCANNING METADATA: {idx + 1}/{total}] {filename}"
-            self.root.after(0, lambda txt=status_text: self.lbl_status.config(text=txt, fg=self.yellow))
-            
-            if path in self.meta_cache:
-                title, game_id = self.meta_cache[path]["title"], self.meta_cache[path]["game_id"]
-                self.root.after(0, lambda t=title, g=game_id, f=filename: self.log_term(f"Cached: '{f}' -> '{t}' [{g}]"))
-            else:
-                try:
-                    title, game_id = PSPImageReader.get_game_metadata(path)
-                    if title:
-                        self.meta_cache[path] = {"title": title, "game_id": game_id}
-                        self.save_meta_cache()
-                        self.root.after(0, lambda t=title, g=game_id, f=filename: self.log_term(f"Loaded: '{f}' -> '{t}' [{g}]"))
-                    else:
-                        self.root.after(0, lambda f=filename: self.log_term(f"Warning: No PARAM.SFO found for '{f}'", is_error=True))
-                except Exception as e:
-                    self.root.after(0, lambda f=filename, err=str(e): self.log_term(f"Metadata read error on '{f}': {err}", is_error=True))
-
+        total_size_bytes = sum(os.path.getsize(p) for p in file_list)
         total_size_mb = total_size_bytes / (1024 * 1024)
-        self.root.after(0, lambda: self._finalize_file_loading(total, total_size_mb))
 
-    def _finalize_file_loading(self, count, total_size_mb):
-        self.lbl_file.config(text=f"LOADED: {count} NODE(S) | {total_size_mb:.2f} MB", fg=self.cyan)
+        self.lbl_file.config(text=f"LOADED: {total} NODE(S) | {total_size_mb:.2f} MB", fg=self.cyan)
         if not self.custom_output_dir and self.file_paths:
             self.lbl_out_title.config(text=f"OUTPUT: .../compressed (Auto)")
-        self.lbl_status.config(text=f"STATUS: READY ({count} GAMES LOADED)", fg=self.cyan)
+        self.lbl_status.config(text=f"STATUS: READY ({total} GAMES LOADED)", fg=self.cyan)
         self.btn_compress.config(state=tk.NORMAL)
         self.btn_rename.config(state=tk.NORMAL)
-        self.btn_browse_file.config(state=tk.NORMAL)
-        self.btn_browse_folder.config(state=tk.NORMAL)
-        self.log_term(f"Successfully processed and verified {count} game file(s).")
+        self.log_term(f"Successfully loaded {total} game file(s) instantly (Metadata scanning deferred).")
         self.update_estimate()
 
     def test_metadata(self):
         if not self.file_paths:
-            messagebox.showwarning("NOTICE", "Please select at least one file first to test metadata.")
+            messagebox.showwarning("NOTICE", "Please select at least one file first to test local naming.")
             return
         
         test_file = self.file_paths[0]
-        self.log_term(f"Testing local metadata for: {os.path.basename(test_file)}")
+        filename = os.path.basename(test_file)
+        self.log_term(f"Testing local metadata for: {filename}")
         title, game_id = PSPImageReader.get_game_metadata(test_file)
         
-        msg = f"File: {os.path.basename(test_file)}\n\n"
+        msg = f"File: {filename}\n\n"
         if title:
+            ext = os.path.splitext(filename)[1]
+            preview_new_name = self.format_filename(title, game_id, ext)
             msg += f"Detected Title: {title}\n"
-            msg += f"Detected Game ID: {game_id}"
-            self.log_term(f"Metadata OK -> Title: '{title}' [{game_id}]")
+            msg += f"Detected Game ID: {game_id}\n\n"
+            msg += f"Preview Formatted Name:\n➔ {preview_new_name}"
+            self.log_term(f"Local Naming OK -> '{title}' [{game_id}]")
         else:
-            msg += "RESULT: Could not locate PARAM.SFO header."
-            self.log_term(f"Metadata FAILED for {os.path.basename(test_file)}", is_error=True)
+            msg += "RESULT: Could not locate PARAM.SFO header in this image."
+            self.log_term(f"Local Naming FAILED for {filename}", is_error=True)
             
-        messagebox.showinfo("Metadata Diagnostic", msg)
+        messagebox.showinfo("Local Naming Diagnostic", msg)
 
     def test_online_metadata(self):
         if not self.file_paths:
@@ -721,8 +691,11 @@ class DuckShrinkApp:
                 
         msg = f"File: {filename}\n\n"
         if online_title:
+            ext = os.path.splitext(filename)[1]
+            preview_new_name = self.format_filename(online_title, online_id or lookup_id or "", ext)
             msg += f"Online Title Match: {online_title}\n"
-            msg += f"Matched Game ID: {online_id or lookup_id or 'N/A'}"
+            msg += f"Matched Game ID: {online_id or lookup_id or 'N/A'}\n\n"
+            msg += f"Preview Formatted Name:\n➔ {preview_new_name}"
             self.log_term(f"Online Lookup Success -> '{online_title}' [{online_id}]")
         else:
             msg += "RESULT: No online match found in database for this file."
