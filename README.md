@@ -1,4 +1,4 @@
-# 🦆 DuckyISO
+# 🦆 DuckShrink_psp
 A cyberpunk-styled, multithreaded PSP ISO/CSO/ZSO batch compressor, metadata reader, and custom file renamer built for Linux Mint.
 
 ## 🚀 One-Line Installer
