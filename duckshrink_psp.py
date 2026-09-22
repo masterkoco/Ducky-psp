@@ -36,7 +36,7 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor v9.8")
+        self.root.title("DuckShrink_PSP // Batch Compressor v9.9")
         self.root.geometry("660x1160")
         
         os.makedirs(LOG_DIR, exist_ok=True)
@@ -114,7 +114,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.8]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.9]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         # Right Header Action Buttons (Themes & Golden Donate Button)
@@ -299,7 +299,7 @@ class DuckShrinkApp:
         self.slider.pack(fill="x")
         
         # Size Estimate Display
-        self.lbl_estimate = tk.Label(root, text="ESTIMATED YIELD: -- MB ?", font=("Monospace", 10, "bold"), bg=self.bg_color, fg=self.yellow)
+        self.lbl_estimate = tk.Label(root, text="ESTIMATED YIELD: -- ?", font=("Monospace", 10, "bold"), bg=self.bg_color, fg=self.yellow)
         self.lbl_estimate.pack(pady=3)
         
         # Action Buttons
@@ -354,7 +354,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v9.8 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v9.9 Initialized successfully.")
 
     def load_config(self):
         self.saved_settings = {}
@@ -776,6 +776,11 @@ class DuckShrinkApp:
         total_size_bytes = sum(os.path.getsize(p) for p in file_list)
         total_size_mb = total_size_bytes / (1024 * 1024)
 
+        if total_size_mb >= 1024:
+            size_disp = f"{total_size_mb / 1024:.2f} GB"
+        else:
+            size_disp = f"{total_size_mb:.2f} MB"
+
         # Automatically check output folders for completed/existing compressed files
         fmt = self.format_var.get().lower()
         auto_detected_count = 0
@@ -793,7 +798,7 @@ class DuckShrinkApp:
             self.save_history()
             self.log_term(f"Output folder scan: Auto-detected {auto_detected_count} already compressed file(s).")
 
-        self.lbl_file.config(text=f"LOADED: {total} NODE(S) | {total_size_mb:.2f} MB", fg=self.cyan)
+        self.lbl_file.config(text=f"LOADED: {total} NODE(S) | {size_disp}", fg=self.cyan)
         if not self.custom_output_dir and self.file_paths:
             self.lbl_out_title.config(text=f"OUTPUT: .../compressed (Auto)")
         self.lbl_status.config(text=f"STATUS: READY ({total} GAMES LOADED)", fg=self.cyan)
@@ -1049,7 +1054,12 @@ class DuckShrinkApp:
                 total_est_size += (f_size * ratio) + overhead
 
             est_size_mb = total_est_size / (1024 * 1024)
-            self.root.after(0, lambda: self.lbl_estimate.config(text=f"ESTIMATED YIELD: ~{est_size_mb:.2f} MB ?", fg=self.yellow))
+            if est_size_mb >= 1024:
+                yield_str = f"~{est_size_mb / 1024:.2f} GB"
+            else:
+                yield_str = f"~{est_size_mb:.2f} MB"
+
+            self.root.after(0, lambda: self.lbl_estimate.config(text=f"ESTIMATED YIELD: {yield_str} ?", fg=self.yellow))
         except Exception as e:
             self.log_to_file("ERROR", f"Estimate calculation failed: {str(e)}")
             self.root.after(0, lambda: self.lbl_estimate.config(text="ESTIMATE_FAIL ?", fg=self.pink))
