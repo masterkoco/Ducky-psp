@@ -25,25 +25,26 @@ try:
 except ImportError:
     zstd = None
 
-CONFIG_FILE = "duckshrink_config.json"
-HISTORY_FILE = "duckshrink_history.json"
-META_CACHE_FILE = "duckshrink_meta_cache.json"
-UNDO_LOG_FILE = "duckshrink_undo_log.json"
-LOG_DIR = "logs"
+# Base path enforcement: Keep configs & logs inside the script's installation directory (/opt/duckshrink or local folder)
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(APP_DIR, "duckshrink_config.json")
+HISTORY_FILE = os.path.join(APP_DIR, "duckshrink_history.json")
+META_CACHE_FILE = os.path.join(APP_DIR, "duckshrink_meta_cache.json")
+UNDO_LOG_FILE = os.path.join(APP_DIR, "duckshrink_undo_log.json")
+LOG_DIR = os.path.join(APP_DIR, "logs")
 
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor v9.6")
+        self.root.title("DuckShrink_PSP // Batch Compressor v9.7")
         self.root.geometry("660x1120")
         
         os.makedirs(LOG_DIR, exist_ok=True)
         
         # Robust Window / Taskbar Icon Loader
         try:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
             for icon_name in ("icon.png", "icon.ico"):
-                icon_path = os.path.join(base_dir, icon_name)
+                icon_path = os.path.join(APP_DIR, icon_name)
                 if not os.path.exists(icon_path):
                     icon_path = os.path.join("/opt/duckshrink", icon_name)
                     
@@ -102,7 +103,7 @@ class DuckShrinkApp:
         self.load_meta_cache()
         self.load_undo_log()
         
-        self.sound_file = "quack.ogg"
+        self.sound_file = os.path.join(APP_DIR, "quack.ogg")
         self._ensure_quack_downloaded()
         
         self.style = ttk.Style()
@@ -113,7 +114,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.6]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v9.7]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         # Right Header Action Buttons (Themes & Golden Donate Button)
@@ -349,7 +350,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v9.6 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v9.7 Initialized successfully.")
 
     def load_config(self):
         self.saved_settings = {}
