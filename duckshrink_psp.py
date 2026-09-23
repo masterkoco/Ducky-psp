@@ -28,7 +28,6 @@ except ImportError:
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(APP_DIR, "duckshrink_config.json")
-HISTORY_FILE = os.path.join(APP_DIR, "duckshrink_history.json")
 META_CACHE_FILE = os.path.join(APP_DIR, "duckshrink_meta_cache.json")
 UNDO_LOG_FILE = os.path.join(APP_DIR, "duckshrink_undo_log.json")
 LOG_DIR = os.path.join(APP_DIR, "logs")
@@ -36,7 +35,7 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor & PSP SD Formatter v10.19")
+        self.root.title("DuckShrink_PSP // Batch Compressor & PSP SD Formatter v10.22")
         self.root.geometry("660x1420")
         
         os.makedirs(LOG_DIR, exist_ok=True)
@@ -103,7 +102,6 @@ class DuckShrinkApp:
         self.cancel_flag = False
         
         self.load_config()
-        self.load_history()
         self.load_meta_cache()
         self.load_undo_log()
         
@@ -118,7 +116,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.19]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.22]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         header_right_frame = tk.Frame(header_frame, bg=self.bg_color)
@@ -314,7 +312,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v10.19 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v10.22 Initialized successfully.")
 
     def scan_removable_drives(self):
         drive_entries = []
@@ -631,24 +629,6 @@ class DuckShrinkApp:
         except Exception:
             pass
 
-    def load_history(self):
-        self.completed_history = set()
-        if os.path.exists(HISTORY_FILE):
-            try:
-                with open(HISTORY_FILE, 'r') as f:
-                    data = json.load(f)
-                    self.completed_history = set(data.get("completed_files", []))
-            except Exception:
-                pass
-
-    def save_history(self):
-        try:
-            data = {"completed_files": list(self.completed_history)}
-            with open(HISTORY_FILE, 'w') as f:
-                json.dump(data, f, indent=4)
-        except Exception:
-            pass
-
     def load_meta_cache(self):
         self.meta_cache = {}
         if os.path.exists(META_CACHE_FILE):
@@ -916,20 +896,15 @@ class DuckShrinkApp:
             messagebox.showwarning("NOTICE", "Please select PS1 disc files first using '[ SELECT PS1 CUE/BIN ]'.")
             return
         
-        already_done = [p for p in self.ps1_discs if p in self.completed_history]
-        skip_flag = False
-        if already_done:
-            skip_flag = messagebox.askyesno("History Match", f"{len(already_done)} of the selected PS1 disc(s) have already been converted previously.\n\nWould you like to skip them? (Click 'No' to re-convert/override)")
-
         self.log_term("Starting PS1 to EBOOT.PBP conversion protocol...")
         self.is_converting = True
         self.cancel_flag = False
         self.btn_compress.config(state=tk.DISABLED)
         self.btn_cancel.config(state=tk.NORMAL)
         
-        threading.Thread(target=self._run_ps1_conversion_thread, args=(skip_flag,), daemon=True).start()
+        threading.Thread(target=self._run_ps1_conversion_thread, daemon=True).start()
 
-    def _run_ps1_conversion_thread(self, skip_flag):
+    def _run_ps1_conversion_thread(self):
         success, failed, skipped = 0, 0, 0
         total_files = len(self.ps1_discs)
         
@@ -938,14 +913,11 @@ class DuckShrinkApp:
         for idx, path in enumerate(self.ps1_discs):
             if self.cancel_flag: break
             filename = os.path.basename(path)
-            
-            if skip_flag and path in self.completed_history:
-                skipped += 1
-                self.log_term(f"Skipping previously converted: {filename}")
-                continue
-
             dirname = os.path.dirname(path)
             base_name = os.path.splitext(filename)[0]
+
+            out_dir = self.custom_output_dir if self.custom_output_dir else os.path.join(dirname, "compressed")
+            eboot_path = os.path.join(out_dir, f"{base_name}_EBOOT.PBP")
             
             active_icon0 = self.ps1_icon0
             active_pic1 = self.ps1_pic1
@@ -971,10 +943,7 @@ class DuckShrinkApp:
             self.progress_batch["value"] = idx
             
             try:
-                out_dir = self.custom_output_dir if self.custom_output_dir else os.path.join(dirname, "compressed")
                 os.makedirs(out_dir, exist_ok=True)
-                
-                eboot_path = os.path.join(out_dir, f"{base_name}_EBOOT.PBP")
                 
                 header_size = 40
                 off_sfo = header_size
@@ -1001,8 +970,6 @@ class DuckShrinkApp:
                             f_out.write(chunk)
                             
                 success += 1
-                self.completed_history.add(path)
-                self.save_history()
                 self.log_term(f"Completed {counter_str}: Generated EBOOT for {filename}")
                 self.progress_batch["value"] = idx + 1
             except Exception as e:
@@ -1116,18 +1083,13 @@ class DuckShrinkApp:
         if not self.check_and_install_maxcso():
             return
 
-        already_done = [p for p in self.file_paths if p in self.completed_history]
-        skip_flag = False
-        if already_done:
-            skip_flag = messagebox.askyesno("History Match", f"{len(already_done)} of the selected file(s) have already been compressed previously.\n\nWould you like to skip them? (Click 'No' to re-compress/override)")
-
-        fmt = self.format_var.get()
+        fmt = self.format_var.get().lower()
         target_data = []
+
         for path in self.file_paths:
-            if skip_flag and path in self.completed_history:
-                continue
             base_ext = os.path.splitext(path)[1].lower()
-            base_name = os.path.basename(path).replace(base_ext, f".{fmt.lower()}")
+            base_name_only = os.path.splitext(os.path.basename(path))[0]
+            target_filename = f"{base_name_only}.{fmt}"
             parent_dir = os.path.dirname(path)
             
             if self.custom_output_dir:
@@ -1139,10 +1101,10 @@ class DuckShrinkApp:
                     out_dir = os.path.join(parent_dir, "compressed")
                     
             os.makedirs(out_dir, exist_ok=True)
-            target_data.append((path, os.path.join(out_dir, base_name)))
+            target_data.append((path, os.path.join(out_dir, target_filename)))
 
         if not target_data:
-            messagebox.showinfo("Notice", "All selected files were skipped based on conversion history.")
+            messagebox.showinfo("Notice", "No files available for compression.")
             return
             
         self.is_converting = True
@@ -1161,14 +1123,14 @@ class DuckShrinkApp:
         total_files = len(target_data)
         self.progress_batch["maximum"] = total_files
         
-        is_zso = (fmt.upper() == "ZSO")
+        is_zso = (fmt.lower() == "zso")
         
         for idx, (in_path, out_path) in enumerate(target_data):
             if self.cancel_flag: break
             counter_str = f"[{idx + 1}/{total_files}]"
             filename = os.path.basename(in_path)
             
-            self.log_term(f"Compressing {counter_str}: {filename} -> {fmt}")
+            self.log_term(f"Compressing {counter_str}: {filename} -> {fmt.upper()}")
             self.lbl_status.config(text=f"COMPRESSING {counter_str}: {filename}", fg=self.cyan)
             self.progress_batch["value"] = idx
             
@@ -1186,8 +1148,6 @@ class DuckShrinkApp:
                 
                 if process.returncode == 0:
                     success += 1
-                    self.completed_history.add(in_path)
-                    self.save_history()
                     self.log_term(f"Successfully compressed: {filename}")
                 else:
                     failed += 1
