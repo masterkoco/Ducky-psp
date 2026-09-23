@@ -5,6 +5,7 @@ import random
 import struct
 import time
 import re
+import shutil
 import threading
 import subprocess
 import urllib.request
@@ -35,7 +36,7 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor & PS1 Eboot v10.8")
+        self.root.title("DuckShrink_PSP // Batch Compressor & PS1 Eboot v10.12")
         self.root.geometry("660x1380")
         
         os.makedirs(LOG_DIR, exist_ok=True)
@@ -92,7 +93,6 @@ class DuckShrinkApp:
         self.file_paths = []
         self.ps1_discs = []
         
-        # PS1 Custom Artwork Paths
         self.ps1_icon0 = ""
         self.ps1_pic0 = ""
         self.ps1_pic1 = ""
@@ -118,7 +118,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.8]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.12]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         header_right_frame = tk.Frame(header_frame, bg=self.bg_color)
@@ -185,13 +185,29 @@ class DuckShrinkApp:
                                         activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=5, pady=2)
         self.btn_change_out.pack(side=tk.RIGHT, padx=2)
 
+        # Action Buttons
+        self.frame_actions = tk.Frame(root, bg=self.bg_color)
+        self.frame_actions.pack(pady=4)
+        
+        self.btn_compress = tk.Button(self.frame_actions, text="[ START COMPRESSION ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.cyan, 
+                                     activebackground=self.cyan, activeforeground="black", command=self.start_compression, relief=tk.SOLID, bd=1, padx=8, pady=5)
+        self.btn_compress.pack(side=tk.LEFT, padx=4)
+
+        self.btn_rename = tk.Button(self.frame_actions, text="[ START RENAME ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.yellow, 
+                                    activebackground=self.yellow, activeforeground="black", command=self.start_rename, relief=tk.SOLID, bd=1, padx=8, pady=5)
+        self.btn_rename.pack(side=tk.LEFT, padx=4)
+
+        self.btn_cancel = tk.Button(self.frame_actions, text="[ ABORT ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.pink, 
+                                    activebackground=self.pink, activeforeground="black", command=self.cancel_action, relief=tk.SOLID, bd=1, padx=8, pady=5, state=tk.DISABLED)
+        self.btn_cancel.pack(side=tk.LEFT, padx=4)
+
         # Dynamic Mode Panels & Container
         self.dynamic_container = tk.Frame(root, bg=self.bg_color)
         self.dynamic_container.pack(fill="x", padx=30, pady=2)
 
         self.build_psp_mode_panel()
         self.build_ps1_mode_panel()
-        self.update_mode_visibility() 
+        self.update_mode_visibility()  
         
         # Format Selection & Multi-Threading Config Frame
         self.frame_format = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.cyan, highlightthickness=2, padx=8, pady=4)
@@ -242,22 +258,6 @@ class DuckShrinkApp:
         self.lbl_estimate = tk.Label(root, text="ESTIMATED YIELD: -- ?", font=("Monospace", 10, "bold"), bg=self.bg_color, fg=self.yellow)
         self.lbl_estimate.pack(pady=3)
         
-        # Action Buttons
-        self.frame_actions = tk.Frame(root, bg=self.bg_color)
-        self.frame_actions.pack(pady=4)
-        
-        self.btn_compress = tk.Button(self.frame_actions, text="[ START COMPRESSION ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.cyan, 
-                                     activebackground=self.cyan, activeforeground="black", command=self.start_compression, relief=tk.SOLID, bd=1, padx=8, pady=5)
-        self.btn_compress.pack(side=tk.LEFT, padx=4)
-
-        self.btn_rename = tk.Button(self.frame_actions, text="[ START RENAME ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.yellow, 
-                                    activebackground=self.yellow, activeforeground="black", command=self.start_rename, relief=tk.SOLID, bd=1, padx=8, pady=5)
-        self.btn_rename.pack(side=tk.LEFT, padx=4)
-
-        self.btn_cancel = tk.Button(self.frame_actions, text="[ ABORT ]", font=("Monospace", 9, "bold"), bg=self.panel_bg, fg=self.pink, 
-                                    activebackground=self.pink, activeforeground="black", command=self.cancel_action, relief=tk.SOLID, bd=1, padx=8, pady=5, state=tk.DISABLED)
-        self.btn_cancel.pack(side=tk.LEFT, padx=4)
-        
         # Progress Tracking
         self.lbl_status = tk.Label(root, text="SYSTEM IDLE", bg=self.bg_color, fg=self.text_color, font=("Monospace", 9, "bold"))
         self.lbl_status.pack(pady=2)
@@ -294,7 +294,7 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v10.8 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v10.12 Initialized successfully.")
 
     def build_psp_mode_panel(self):
         self.panel_psp = tk.Frame(self.dynamic_container, bg=self.bg_color)
@@ -408,7 +408,6 @@ class DuckShrinkApp:
         
         found_count = 0
         for ext in ('.png', '.jpg', '.jpeg'):
-            # Check for exact game name match or generic cover names
             for candidate_prefix in (base_name, "cover", "front", "icon0", "art"):
                 path = os.path.join(dirname, f"{candidate_prefix}{ext}")
                 if os.path.exists(path):
@@ -773,13 +772,16 @@ class DuckShrinkApp:
         if folder_path:
             self.last_dir = folder_path
             found_files = []
+            valid_exts = ('.iso', '.cso', '.zso', '.dax', '.bin', '.cue', '.img')
             for root_dir, _, files in os.walk(folder_path):
                 for file in files:
-                    if file.lower().endswith(('.iso', '.cso', '.zso', '.dax', '.bin', '.cue', '.img')):
+                    if file.lower().endswith(valid_exts):
                         found_files.append(os.path.join(root_dir, file))
             if found_files:
                 self.process_loaded_files(list(set(found_files)))
                 self.save_config()
+            else:
+                messagebox.showwarning("NOTICE", "No supported game files found in the selected folder.")
 
     def browse_ps1_files(self):
         paths = filedialog.askopenfilenames(initialdir=self.last_dir, filetypes=[("PS1 Disc / Cue Sheets", "*.cue *.bin *.img *.iso"), ("All Files", "*.*")])
@@ -813,7 +815,6 @@ class DuckShrinkApp:
             dirname = os.path.dirname(path)
             base_name = os.path.splitext(filename)[0]
             
-            # --- Auto-Scan directory for matching artwork if not manually set ---
             active_icon0 = self.ps1_icon0
             active_pic1 = self.ps1_pic1
             
@@ -829,7 +830,6 @@ class DuckShrinkApp:
                         break
 
             icon0_data = open(active_icon0, 'rb').read() if active_icon0 and os.path.exists(active_icon0) else b''
-            pic0_data = b''
             pic1_data = open(active_pic1, 'rb').read() if active_pic1 and os.path.exists(active_pic1) else b''
 
             counter_str = f"[{idx + 1}/{total_files}]"
@@ -951,6 +951,29 @@ class DuckShrinkApp:
     def undo_rename(self):
         messagebox.showinfo("Undo", "Undo history cleared.")
 
+    def check_and_install_maxcso(self):
+        """Checks for maxcso on system. If missing, attempts auto-installation via terminal / apt."""
+        if shutil.which("maxcso"):
+            return True
+        
+        self.log_term("Missing backend dependency 'maxcso'. Attempting automatic installation...", is_error=True)
+        try:
+            # Run installation commands in sequence
+            install_cmd = "sudo apt update && sudo apt install -y build-essential pkgconf zlib1g-dev liblz4-dev libuv1-dev git && git clone https://github.com/unknownbrackets/maxcso.git /tmp/maxcso && cd /tmp/maxcso && make && sudo make install"
+            
+            # Open terminal prompt to ask for sudo safely or spawn subprocess
+            process = subprocess.Popen(["x-terminal-emulator", "-e", f"bash -c '{install_cmd}; echo Press enter to close; read'"])
+            process.wait()
+            
+            if shutil.which("maxcso"):
+                self.log_term("Successfully installed 'maxcso' backend!")
+                return True
+        except Exception as e:
+            self.log_term(f"Auto-install failed: {str(e)}", is_error=True)
+            
+        messagebox.showerror("Missing Dependency", "Could not automatically install 'maxcso'. Please install it manually.")
+        return False
+
     def start_compression(self):
         if self.app_mode == "PS1":
             self.start_ps1_conversion()
@@ -958,6 +981,10 @@ class DuckShrinkApp:
 
         if not self.file_paths:
             messagebox.showerror("SYS_ERROR", "NO FILES SELECTED FOR COMPRESSION.")
+            return
+
+        # Ensure maxcso is present before starting compression
+        if not self.check_and_install_maxcso():
             return
 
         fmt = self.format_var.get()
@@ -980,6 +1007,9 @@ class DuckShrinkApp:
             
         self.is_converting = True
         self.cancel_flag = False
+        self.btn_compress.config(state=tk.DISABLED)
+        self.btn_cancel.config(state=tk.NORMAL)
+        
         threading.Thread(target=self._run_multithreaded_compression, args=(target_data, fmt, self.level_var.get(), int(self.threads_var.get())), daemon=True).start()
 
     def cancel_action(self):
@@ -989,17 +1019,51 @@ class DuckShrinkApp:
     def _run_multithreaded_compression(self, target_data, fmt, level, max_workers):
         success, failed = 0, 0
         total_files = len(target_data)
+        self.progress_batch["maximum"] = total_files
+        
+        is_zso = (fmt.upper() == "ZSO")
+        
         for idx, (in_path, out_path) in enumerate(target_data):
             if self.cancel_flag: break
             counter_str = f"[{idx + 1}/{total_files}]"
             filename = os.path.basename(in_path)
-            self.log_term(f"Processing {counter_str}: {filename}")
+            
+            self.log_term(f"Compressing {counter_str}: {filename} -> {fmt}")
+            self.lbl_status.config(text=f"COMPRESSING {counter_str}: {filename}", fg=self.cyan)
+            self.progress_batch["value"] = idx
+            
             try:
-                time.sleep(0.1)
-                success += 1
-            except Exception:
+                # Execute live maxcso compilation with proper level & format flags
+                cmd = ["maxcso", in_path, "-o", out_path, f"--{level}"]
+                if is_zso:
+                    cmd.append("--zso")
+                
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in process.stdout:
+                    pass  # Read process stream
+                process.wait()
+                
+                if process.returncode == 0:
+                    success += 1
+                    self.log_term(f"Successfully compressed: {filename}")
+                else:
+                    failed += 1
+                    self.log_term(f"maxcso exited with error code for {filename}", is_error=True)
+                    
+                self.progress_batch["value"] = idx + 1
+            except Exception as e:
                 failed += 1
-        self.root.after(0, lambda: messagebox.showinfo("Complete", f"Batch compression finished!\nSuccessful: {success}"))
+                self.log_term(f"Error processing {filename}: {str(e)}", is_error=True)
+
+        self.root.after(0, lambda: self._finalize_compression_ui(success, failed))
+
+    def _finalize_compression_ui(self, success, failed):
+        self.is_converting = False
+        self.btn_compress.config(state=tk.NORMAL)
+        self.btn_cancel.config(state=tk.DISABLED)
+        self.lbl_status.config(text="BATCH COMPRESSION COMPLETE", fg=self.cyan)
+        self._play_quack()
+        messagebox.showinfo("Complete", f"Batch compression finished!\nSuccessful: {success}\nFailed: {failed}")
 
 
 class PSPImageReader:
