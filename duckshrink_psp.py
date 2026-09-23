@@ -13,7 +13,7 @@ import urllib.parse
 import datetime
 import webbrowser
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
@@ -36,8 +36,8 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 class DuckShrinkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DuckShrink_PSP // Batch Compressor & PS1 Eboot v10.12")
-        self.root.geometry("660x1380")
+        self.root.title("DuckShrink_PSP // Batch Compressor & PSP SD Formatter v10.16")
+        self.root.geometry("660x1420")
         
         os.makedirs(LOG_DIR, exist_ok=True)
         
@@ -118,7 +118,7 @@ class DuckShrinkApp:
         header_frame = tk.Frame(root, bg=self.bg_color)
         header_frame.pack(pady=(8, 2), fill="x", padx=20)
         
-        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.12]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
+        self.lbl_title = tk.Label(header_frame, text="DUCKSHRINK_PSP [v10.16]", font=("Monospace", 15, "bold"), bg=self.bg_color, fg=self.cyan)
         self.lbl_title.pack(side=tk.LEFT)
         
         header_right_frame = tk.Frame(header_frame, bg=self.bg_color)
@@ -184,6 +184,26 @@ class DuckShrinkApp:
         self.btn_change_out = tk.Button(self.frame_output, text="[ CHANGE ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.pink,
                                         activebackground=self.pink, activeforeground="black", command=self.change_output_dir, relief=tk.SOLID, bd=1, padx=5, pady=2)
         self.btn_change_out.pack(side=tk.RIGHT, padx=2)
+
+        # PSP Memory Stick / SD Card Formatter Hub Frame
+        self.frame_formatter = tk.Frame(root, bg=self.panel_bg, highlightbackground=self.yellow, highlightthickness=2, padx=8, pady=4)
+        self.frame_formatter.pack(pady=3, fill="x", padx=30)
+
+        fmt_hdr = tk.Label(self.frame_formatter, text="⭐ PSP MEMORY STICK FORMATTER (64KB FAT32):", bg=self.panel_bg, fg=self.yellow, font=("Monospace", 9, "bold"))
+        fmt_hdr.pack(anchor="w", padx=2)
+
+        fmt_row = tk.Frame(self.frame_formatter, bg=self.panel_bg)
+        fmt_row.pack(fill="x", pady=2)
+
+        self.btn_scan_drives = tk.Button(fmt_row, text="[ SCAN DRIVES ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.cyan, command=self.scan_removable_drives, relief=tk.SOLID, bd=1, padx=5, pady=2)
+        self.btn_scan_drives.pack(side=tk.LEFT, padx=2)
+
+        self.drive_var = tk.StringVar(value="Select Removable Drive (With Size)...")
+        self.drive_dropdown = ttk.Combobox(fmt_row, textvariable=self.drive_var, state="readonly", width=34)
+        self.drive_dropdown.pack(side=tk.LEFT, padx=4)
+
+        self.btn_format_card = tk.Button(fmt_row, text="[ FORMAT 64KB FAT32 ]", font=("Monospace", 8, "bold"), bg=self.bg_color, fg=self.pink, command=self.confirm_and_format_drive, relief=tk.SOLID, bd=1, padx=5, pady=2)
+        self.btn_format_card.pack(side=tk.LEFT, padx=2)
 
         # Action Buttons
         self.frame_actions = tk.Frame(root, bg=self.bg_color)
@@ -294,7 +314,109 @@ class DuckShrinkApp:
             except Exception:
                 pass
 
-        self.log_term("DuckShrink_PSP v10.12 Initialized successfully.")
+        self.log_term("DuckShrink_PSP v10.16 Initialized successfully.")
+
+    def scan_removable_drives(self):
+        drive_entries = []
+        try:
+            if os.name == 'posix':
+                df_out = subprocess.run(["df", "-B1"], capture_output=True, text=True)
+                for line in df_out.stdout.splitlines()[1:]:
+                    parts = line.split()
+                    if len(parts) >= 6:
+                        dev, total_bytes, mount = parts[0], int(parts[1]), parts[5]
+                        if dev.startswith('/dev/sd') or dev.startswith('/dev/mmcblk') or '/media/' in mount or '/mnt/' in mount:
+                            size_gb = total_bytes / (1024**3)
+                            size_str = f"{size_gb:.1f} GB" if size_gb >= 1 else f"{total_bytes / (1024**2):.0f} MB"
+                            display_str = f"[{size_str}] {mount} ({dev})"
+                            drive_entries.append((display_str, dev, mount))
+            else:
+                import ctypes
+                bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+                for letter in range(26):
+                    if bitmask & (1 << letter):
+                        d = f"{chr(65 + letter)}:\\"
+                        try:
+                            if ctypes.windll.kernel32.GetDriveTypeW(d) == 3:
+                                free_bytes = ctypes.c_ulonglong(0)
+                                total_bytes = ctypes.c_ulonglong(0)
+                                ctypes.windll.kernel32.GetDiskFreeSpaceExW(ctypes.c_wchar_p(d), None, ctypes.byref(total_bytes), ctypes.byref(free_bytes))
+                                size_gb = total_bytes.value / (1024**3)
+                                size_str = f"{size_gb:.1f} GB" if size_gb >= 1 else f"{total_bytes.value / (1024**2):.0f} MB"
+                                display_str = f"[{size_str}] {d}"
+                                drive_entries.append((display_str, d, d))
+                        except Exception:
+                            pass
+        except Exception as e:
+            self.log_term(f"Drive scan error: {str(e)}", is_error=True)
+
+        if drive_entries:
+            display_list = [item[0] for item in drive_entries]
+            self.drive_dropdown['values'] = display_list
+            self.drive_var.set(display_list[0])
+            self.log_term(f"Scanned and identified {len(drive_entries)} mountable storage volume(s).")
+        else:
+            fallback = filedialog.askdirectory(title="Select PSP SD Card Mount Point")
+            if fallback:
+                self.drive_dropdown['values'] = [fallback]
+                self.drive_var.set(fallback)
+            else:
+                messagebox.showwarning("NOTICE", "No removable drives detected automatically.")
+
+    def confirm_and_format_drive(self):
+        selected = self.drive_var.get()
+        if not selected or selected.startswith("Select"):
+            messagebox.showwarning("NOTICE", "Please select a valid target drive first using '[ SCAN DRIVES ]'.")
+            return
+        
+        target_id = selected.split('(')[-1].strip(')') if '(' in selected else selected
+
+        # Prompt user for volume label
+        vol_name = simpledialog.askstring("Volume Label", "Enter volume name for the PSP memory stick:", initialvalue="PSP_MS")
+        if vol_name is None:
+            return # Cancelled
+        vol_name = re.sub(r'[^A-Za-z0-9_]', '', vol_name)[:11].upper() or "PSP_MS"
+
+        warning_msg = (
+            f"⚠️ CRITICAL WARNING: YOU ARE ABOUT TO FORMAT:\n\n"
+            f"Target: {selected}\n"
+            f"Identifier: {target_id}\n"
+            f"New Label: {vol_name}\n\n"
+            "All files on this storage card will be permanently erased!\n"
+            "Do you want to proceed with formatting to FAT32 (64KB clusters)?"
+        )
+        if not messagebox.askyesno("CONFIRM PSP FORMAT", warning_msg, icon=messagebox.WARNING):
+            return
+        
+        self.log_term(f"Initiating FAT32 64KB format on target: {target_id} with label '{vol_name}'")
+        self.btn_format_card.config(state=tk.DISABLED)
+        
+        threading.Thread(target=self._run_formatting_thread, args=(target_id, vol_name), daemon=True).start()
+
+    def _run_formatting_thread(self, target_path, vol_name):
+        try:
+            if os.name == 'posix':
+                format_script = f"sudo umount {target_path} 2>/dev/null; sudo mkfs.vfat -F 32 -s 128 -n {vol_name} {target_path}"
+                process = subprocess.Popen(["x-terminal-emulator", "-e", f"bash -c '{format_script}; echo; echo Formatting finished. Press Enter to close.; read'"])
+                process.wait()
+                success = (process.returncode == 0)
+            else:
+                drive_letter = target_path[:2]
+                cmd = f"format {drive_letter} /FS:FAT32 /A:64K /V:{vol_name} /Q /Y"
+                res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                success = (res.returncode == 0)
+
+            if success:
+                self.log_term(f"Successfully formatted {target_path} to FAT32 (Label: {vol_name}, 64KB clusters).")
+                self.root.after(0, lambda: messagebox.showinfo("Success", f"Memory stick formatted successfully as '{vol_name}' with 64KB clusters!"))
+            else:
+                self.log_term(f"Formatting failed or cancelled for {target_path}", is_error=True)
+                self.root.after(0, lambda: messagebox.showwarning("Notice", "Formatting process completed or was closed."))
+        except Exception as e:
+            self.log_term(f"Format exception: {str(e)}", is_error=True)
+            self.root.after(0, lambda: messagebox.showerror("Error", f"Formatting error:\n{str(e)}"))
+        
+        self.root.after(0, lambda: self.btn_format_card.config(state=tk.NORMAL))
 
     def build_psp_mode_panel(self):
         self.panel_psp = tk.Frame(self.dynamic_container, bg=self.bg_color)
@@ -952,16 +1074,12 @@ class DuckShrinkApp:
         messagebox.showinfo("Undo", "Undo history cleared.")
 
     def check_and_install_maxcso(self):
-        """Checks for maxcso on system. If missing, attempts auto-installation via terminal / apt."""
         if shutil.which("maxcso"):
             return True
         
         self.log_term("Missing backend dependency 'maxcso'. Attempting automatic installation...", is_error=True)
         try:
-            # Run installation commands in sequence
             install_cmd = "sudo apt update && sudo apt install -y build-essential pkgconf zlib1g-dev liblz4-dev libuv1-dev git && git clone https://github.com/unknownbrackets/maxcso.git /tmp/maxcso && cd /tmp/maxcso && make && sudo make install"
-            
-            # Open terminal prompt to ask for sudo safely or spawn subprocess
             process = subprocess.Popen(["x-terminal-emulator", "-e", f"bash -c '{install_cmd}; echo Press enter to close; read'"])
             process.wait()
             
@@ -983,7 +1101,6 @@ class DuckShrinkApp:
             messagebox.showerror("SYS_ERROR", "NO FILES SELECTED FOR COMPRESSION.")
             return
 
-        # Ensure maxcso is present before starting compression
         if not self.check_and_install_maxcso():
             return
 
@@ -1033,14 +1150,13 @@ class DuckShrinkApp:
             self.progress_batch["value"] = idx
             
             try:
-                # Execute live maxcso compilation with proper level & format flags
                 cmd = ["maxcso", in_path, "-o", out_path, f"--{level}"]
                 if is_zso:
                     cmd.append("--zso")
                 
                 process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 for line in process.stdout:
-                    pass  # Read process stream
+                    pass
                 process.wait()
                 
                 if process.returncode == 0:
